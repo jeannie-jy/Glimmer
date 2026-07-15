@@ -11,6 +11,7 @@ on:
 
 env:
   HARNESS_KEY_PASSWORD: ci-test-password
+  PYTHONPATH: .
 
 jobs:
   unit-test:
