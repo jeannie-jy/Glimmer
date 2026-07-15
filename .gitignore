@@ -16,3 +16,21 @@ buildNumber.properties
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 .claude
+
+# Harness files
+.harness/memory/
+.harness/credentials/
+
+# Environment & secrets
+.env
+*.key
+*.pem
+
+# Build artifacts
+dist/
+build/
+__pycache__/
+.pytest_cache/
+web/dist/
+web/node_modules/
+*.spec

@@ -1,0 +1,17 @@
+model:
+  provider: anthropic
+  model_id: claude-sonnet-5
+  max_tokens: 4096
+
+guardrails:
+  max_retries: 3
+  sandbox_root: .
+  command_whitelist_extra: []
+  timeout_seconds: 30
+
+tools:
+  enabled: [read_file, write_file, execute_shell, run_tests, search_code]
+
+memory:
+  max_context_tokens: 8000
+  learnings_limit: 20
