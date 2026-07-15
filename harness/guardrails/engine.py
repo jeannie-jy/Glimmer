@@ -29,6 +29,9 @@ class GuardrailEngine:
         # Layer 2 & 3: Command safety for shell execution
         if tool_call.name in ("execute_shell", "run_tests"):
             command = tool_call.arguments.get("command", "")
+            if tool_call.name == "run_tests" and not command:
+                path = tool_call.arguments.get("path", "tests/")
+                command = f"python -m pytest {path} -q"
             if command:
                 # Layer 2: Whitelist
                 result = self._whitelist.check(command)

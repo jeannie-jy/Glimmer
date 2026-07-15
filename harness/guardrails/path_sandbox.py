@@ -37,4 +37,6 @@ class PathSandbox:
             )
             if not allowed:
                 return GuardResult(action=GuardAction.BLOCK, layer=1, reason=f"Read outside sandbox: {target}")
+        else:
+            return GuardResult(action=GuardAction.BLOCK, layer=1, reason=f"Unknown access mode: {mode}")
         return GuardResult(action=GuardAction.ALLOW, layer=1)
