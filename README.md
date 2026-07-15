@@ -1,3 +1,7 @@
+[English](README.md) | [中文](README.zh.md)
+
+---
+
 # Lite Agent Harness
 
 A lightweight, model-agnostic coding agent harness with deterministic guardrails and mock-driven testing.
