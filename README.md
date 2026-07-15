@@ -16,7 +16,7 @@ Built from scratch as a final project for the AI4SE course, this harness demonst
 - **Multi-provider LLM support** -- pluggable adapters for Anthropic (Messages API) and OpenAI (Chat Completions API), plus a Mock adapter for zero-network testing.
 - **Three-layer guardrail system** -- Layer 1: filesystem path sandbox. Layer 2: command whitelist. Layer 3: regex-based dangerous pattern blacklist. Each layer can ALLOW, BLOCK, or ASK_HUMAN.
 - **Deterministic feedback analyzer** -- exit-code and structured test-report analysis, not prompt-based. Works identically with or without an LLM. Multi-round self-correction via a retry policy that detects stuck loops.
-- **Web UI with real-time streaming** -- React + TypeScript frontend, FastAPI + WebSocket backend. Streaming token display, tool call cards, guardrail prompts, feedback banners, and a settings panel.
+- **Web UI with real-time streaming** -- React + TypeScript frontend (Open Design / Linear design system, see `DESIGN.md`), FastAPI + WebSocket backend. Streaming token display, tool call cards, guardrail prompts, feedback banners, and a settings panel.
 - **Docker + PyInstaller dual distribution** -- run in a container or as a standalone executable.
 - **Secure credential storage** -- OS keyring (desktop) with AES-GCM encrypted file fallback (Docker). Keys never appear in logs, git history, or plaintext config.
 
@@ -110,6 +110,7 @@ lite-agent-harness/
 │   └── vite.config.ts
 ├── .harness/
 │   └── config.yaml                # Project-level harness configuration
+├── DESIGN.md                       # Open Design / Linear design tokens
 ├── Dockerfile                     # Docker multi-stage build
 ├── LICENSE                        # MIT
 ├── Makefile                       # Build, test, run targets

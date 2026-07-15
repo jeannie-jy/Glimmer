@@ -16,7 +16,7 @@
 - **多供应商 LLM 支持** —— 可插拔适配器，支持 Anthropic（Messages API）和 OpenAI（Chat Completions API），以及用于零网络测试的 Mock 适配器。
 - **三层护栏系统** —— 第一层：文件系统路径沙箱。第二层：命令白名单。第三层：基于正则的危险模式黑名单。每层可以放行、拦截或请求人工审批。
 - **确定性反馈分析器** —— 基于 exit code 和结构化测试报告进行分析，而非提示词驱动。无论是否有 LLM，行为完全一致。通过重试策略实现多轮自我修正，并能检测死循环。
-- **实时 Web 界面** —— React + TypeScript 前端，FastAPI + WebSocket 后端。支持流式输出、工具调用卡片、护栏审批弹窗、反馈横幅和设置面板。
+- **实时 Web 界面** —— React + TypeScript 前端（Open Design / Linear 设计系统，详见 `DESIGN.md`），FastAPI + WebSocket 后端。支持流式输出、工具调用卡片、护栏审批弹窗、反馈横幅和设置面板。
 - **Docker + PyInstaller 双分发** —— 可在容器中运行，也可作为独立可执行文件。
 - **安全的凭据存储** —— 桌面端使用操作系统钥匙串，Docker 环境降级为 AES-GCM 加密文件。密钥绝不出现于日志、Git 历史或明文配置中。
 
@@ -110,6 +110,7 @@ lite-agent-harness/
 │   └── vite.config.ts
 ├── .harness/
 │   └── config.yaml                # 项目级配置
+├── DESIGN.md                       # Open Design / Linear 设计 token
 ├── Dockerfile                     # Docker 多阶段构建
 ├── LICENSE                        # MIT
 ├── Makefile                       # 构建、测试、运行目标
