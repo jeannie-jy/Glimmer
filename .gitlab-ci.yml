@@ -1,0 +1,40 @@
+# Lite Agent Harness CI
+# Runs unit tests (zero network, Mock LLM) and integration tests on every push.
+
+stages:
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  HARNESS_KEY_PASSWORD: "ci-test-password"
+  PYTHONPATH: "."
+
+cache:
+  paths:
+    - .cache/pip/
+
+before_script:
+  - python --version
+  - pip install -r requirements.txt
+
+unit-test:
+  stage: test
+  script:
+    - python -m pytest tests/unit/ -v --tb=short
+  timeout: 5m
+
+integration-test:
+  stage: test
+  script:
+    - python -m pytest tests/integration/ -v --tb=short
+  timeout: 5m
+  needs: ["unit-test"]
+
+demo-test:
+  stage: test
+  script:
+    - python tests/demo/demo_guardrail.py
+    - python tests/demo/demo_sandbox.py
+    - python tests/demo/demo_feedback_loop.py
+  timeout: 2m
+  needs: ["unit-test"]

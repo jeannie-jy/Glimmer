@@ -1,0 +1,151 @@
+/* Design System: Linear (via Open Design)
+   https://github.com/nexu-io/open-design */
+
+/* =========================================================================
+   Design Tokens
+   ========================================================================= */
+
+:root {
+  /* ---- Colors (Semantic) ---- */
+  --color-bg-app: #0d1117;
+  --color-bg-surface: #161b22;
+  --color-bg-element: #1c2128;
+  --color-bg-elevated: #2a3038;
+  --color-bg-input: #0d1117;
+
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #8b949e;
+  --color-text-tertiary: #6e7681;
+
+  --color-border-base: #30363d;
+  --color-border-muted: #21262d;
+
+  --color-accent-primary: #58a6ff;
+  --color-accent-hover: #79c0ff;
+
+  --color-status-success: #3fb950;
+  --color-status-error: #f85149;
+  --color-status-warning: #d29922;
+
+  /* Status backgrounds (alpha) */
+  --color-bg-success: rgba(63, 185, 80, 0.1);
+  --color-bg-error: rgba(248, 81, 73, 0.1);
+  --color-bg-warning: rgba(210, 153, 34, 0.1);
+
+  /* ---- Spacing (4px scale) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  /* ---- Typography ---- */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+
+  /* ---- Radii ---- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* ---- Shadows ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.4);
+
+  /* ---- Transitions ---- */
+  --transition-fast: 150ms;
+  --transition-normal: 250ms;
+}
+
+/* =========================================================================
+   Reset
+   ========================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+  background: var(--color-bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+}
+
+/* =========================================================================
+   Scrollbar
+   ========================================================================= */
+
+::-webkit-scrollbar {
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-base);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* =========================================================================
+   Focus visible
+   ========================================================================= */
+
+:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* =========================================================================
+   Selection
+   ========================================================================= */
+
+::selection {
+  background: var(--color-accent-primary);
+  color: #fff;
+}
