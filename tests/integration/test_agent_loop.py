@@ -90,3 +90,58 @@ class TestAgentLoop:
 
         # Should block, not execute
         assert session.state == State.AWAITING_HUMAN
+
+    @pytest.mark.asyncio
+    async def test_batch_tool_calls(self, tools, guardrails, analyzer, policy):
+        """Agent processes multiple tool calls from a single LLM response."""
+        mock = MockLLMAdapter([
+            LLMResponse(
+                content="Let me run both commands.",
+                stop_reason="tool_use",
+                tool_calls=[
+                    ToolCall(id="t1", name="execute_shell", arguments={"command": "echo first"}),
+                    ToolCall(id="t2", name="execute_shell", arguments={"command": "echo second"}),
+                ],
+            ),
+            LLMResponse(content="Both commands completed.", stop_reason="complete"),
+        ])
+        loop = AgentLoop(tools, guardrails, analyzer, policy)
+
+        session = await loop.run("Run two commands", mock)
+
+        assert session.state == State.COMPLETED
+        assert len(session.tool_calls) == 2, f"Expected 2 tool calls, got {len(session.tool_calls)}"
+        assert session.tool_calls[0].id == "t1"
+        assert session.tool_calls[1].id == "t2"
+
+    @pytest.mark.asyncio
+    async def test_resume_after_approval(self, tools, guardrails, analyzer, policy):
+        """run() pauses at AWAITING_HUMAN, resume() after approve completes."""
+        mock = MockLLMAdapter([
+            LLMResponse(
+                content="Let me run a command.",
+                stop_reason="tool_use",
+                tool_calls=[ToolCall(
+                    id="t1", name="execute_shell",
+                    arguments={"command": "nonexistent_tool_xyz"},
+                )],
+            ),
+            # After resume and approval, LLM sees the result and completes
+            LLMResponse(content="Command executed. Done.", stop_reason="complete"),
+        ])
+        loop = AgentLoop(tools, guardrails, analyzer, policy)
+
+        session = await loop.run("Run a command", mock)
+
+        # Guardrail flags unknown command -> AWAITING_HUMAN
+        assert session.state == State.AWAITING_HUMAN, f"Expected AWAITING_HUMAN, got {session.state}"
+        assert session._pending_approval is not None, "Expected a pending approval"
+
+        # Approve the pending tool
+        session = loop.approve_pending(session)
+        assert session.state == State.OBSERVING
+
+        # Resume the loop — tool will be dispatched (may fail, but gets a result)
+        session = await loop.resume(session, mock)
+        assert session.state == State.COMPLETED
+        assert len(session.tool_calls) >= 1

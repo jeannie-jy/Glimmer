@@ -3,7 +3,7 @@
 from enum import Enum
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class State(str, Enum):
@@ -115,6 +115,10 @@ class Session(BaseModel):
     total_tokens: TokenUsage = Field(default_factory=TokenUsage)
     created_at: datetime = Field(default_factory=datetime.now)
     completed_at: datetime | None = None
+
+    # Runtime-only state (not serialized) for human-in-the-loop
+    _pending_approval: ToolCall | None = PrivateAttr(default=None)
+    _guard_reason: str = PrivateAttr(default="")
 
 
 class ConfigData(BaseModel):
