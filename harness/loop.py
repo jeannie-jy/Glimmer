@@ -82,7 +82,7 @@ class AgentLoop:
         )))
         session.messages.append(Message(role="user", content=task))
         session.state = transition(State.IDLE, EventType.TASK_SUBMIT)
-        await self._emit("state.change", from_state="idle", to_state=session.state.value)
+        await self._emit("state.change", **{"from": "idle", "to": session.state.value})
 
         return await self._run_loop(session, llm, tool_defs)
 
@@ -169,7 +169,7 @@ class AgentLoop:
                 # BLOCK case (no _pending_approval): skip to PLANNING
                 prev = session.state
                 session.state = State.PLANNING
-                await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
 
         tool_defs = self._tools.list_defs()
         return await self._run_loop(session, llm, tool_defs, pending_tool_calls, last_tool_result)
@@ -210,7 +210,7 @@ class AgentLoop:
                 if pending_tool_calls:
                     prev = session.state
                     session.state = transition(session.state, EventType.LLM_TOOL_USE)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                     continue
 
                 # Filter messages: send the LLM a clean conversation history
@@ -225,25 +225,25 @@ class AgentLoop:
 
                 if response.tool_calls:
                     pending_tool_calls = list(response.tool_calls)
-                    prev = session.state
-                    session.state = transition(session.state, EventType.LLM_TOOL_USE)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
                     await self._emit(
                         "llm.response",
                         content=response.content,
                         tool_calls=[t.model_dump() for t in response.tool_calls],
                     )
+                    prev = session.state
+                    session.state = transition(session.state, EventType.LLM_TOOL_USE)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                 else:
+                    await self._emit("llm.response", content=response.content, tool_calls=[])
                     prev = session.state
                     session.state = transition(session.state, EventType.LLM_FINISH)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
-                    await self._emit("llm.response", content=response.content, tool_calls=[])
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
 
             elif session.state == State.EXECUTING:
                 if not pending_tool_calls:
                     prev = session.state
                     session.state = transition(session.state, EventType.GUARD_ALLOW)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                     continue
 
                 tc = pending_tool_calls.pop(0)
@@ -258,7 +258,7 @@ class AgentLoop:
                     ))
                     prev = session.state
                     session.state = transition(session.state, EventType.GUARD_BLOCK)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                     await self._emit(
                         "guardrail.pending",
                         action="blocked", reason=guard_result.reason,
@@ -269,7 +269,7 @@ class AgentLoop:
                     session._guard_reason = guard_result.reason
                     prev = session.state
                     session.state = transition(session.state, EventType.GUARD_ASK_HUMAN)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                     await self._emit(
                         "guardrail.pending",
                         action="ask_human", reason=guard_result.reason,
@@ -291,7 +291,7 @@ class AgentLoop:
                     ))
                     prev = session.state
                     session.state = transition(session.state, EventType.GUARD_ALLOW)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                     await self._emit(
                         "tool.result",
                         tool_name=result.tool_name, exit_code=result.exit_code,
@@ -321,32 +321,32 @@ class AgentLoop:
                     self._policy.record(feedback)
                     prev = session.state
                     session.state = transition(session.state, EventType.FEEDBACK_FAIL)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                 elif feedback.verdict == Verdict.PASS:
                     prev = session.state
                     session.state = transition(session.state, EventType.FEEDBACK_PASS)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                 elif feedback.verdict == Verdict.WARNING:
                     prev = session.state
                     session.state = transition(session.state, EventType.FEEDBACK_WARNING)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                 else:
                     prev = session.state
                     session.state = transition(session.state, EventType.FEEDBACK_UNKNOWN)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
 
                 # Bug 1 fix: if more batch tool calls remain, go back to EXECUTING
                 # instead of PLANNING, to continue processing the batch
                 if session.state == State.PLANNING and pending_tool_calls:
                     prev = session.state
                     session.state = State.EXECUTING
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
 
             elif session.state == State.CORRECTING:
                 if not self._policy.should_retry(session.retry_count) or self._policy.is_stuck():
                     prev = session.state
                     session.state = transition(session.state, EventType.MAX_RETRIES)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                 else:
                     session.retry_count += 1
                     if last_feedback:
@@ -356,7 +356,7 @@ class AgentLoop:
                         ))
                     prev = session.state
                     session.state = transition(session.state, EventType.RETRY)
-                    await self._emit("state.change", from_state=prev.value, to_state=session.state.value)
+                    await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
 
         # Graceful termination for states that didn't complete naturally
         if session.state not in (State.COMPLETED, State.AWAITING_HUMAN, State.ERROR):
