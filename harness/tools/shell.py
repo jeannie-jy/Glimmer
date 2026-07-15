@@ -1,4 +1,5 @@
 """Shell execution tool (sandboxed)."""
+import shlex
 import subprocess
 import time
 from pathlib import Path
@@ -39,7 +40,7 @@ class ExecuteShellTool(Tool):
 
         try:
             proc = subprocess.run(
-                command,
+                shlex.split(command),
                 shell=False,
                 cwd=str(cwd),
                 timeout=self._timeout,
