@@ -6,6 +6,7 @@ stages:
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  HARNESS_KEY_PASSWORD: "ci-test-password"
 
 cache:
   paths:
