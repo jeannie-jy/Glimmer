@@ -140,6 +140,13 @@
 - **内容**：完整 README.md + README.zh.md（双语切换）
 - **耗时**：~5 分钟
 
+#### Task 17: Open Design 集成（后期补充）
+- **子智能体**：sonnet
+- **提交**：`28394b5`
+- **内容**：将前端从纯手写 CSS 升级为 Open Design 的 Linear 设计系统。重写 `index.css` 为结构化的 design token 体系（颜色/间距/字体/圆角/阴影/过渡），所有组件改用 CSS 变量引用，新增 `DESIGN.md` 记录完整 token 参考
+- **触发原因**：项目要求文档明确规定"凡涉及前端 / UI，强烈推荐使用 Open Design 进行界面开发，并在 SPEC 中说明所选设计系统与 skill"
+- **耗时**：~4 分钟
+
 #### 最终审查与修复
 - **子智能体**：sonnet
 - **提交**：`f8d8bb5`

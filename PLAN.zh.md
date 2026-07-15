@@ -4,7 +4,7 @@
 
 **目标：** 构建一个轻量级、模型无关的编码智能体框架，具有确定性护栏、反馈循环、Web UI 和模拟驱动测试。
 
-**架构：** 状态机驱动的智能体核心，带有可插拔的 LLM 适配器（Anthropic/OpenAI/Mock）、三层沙箱护栏、确定性反馈分析器，以及 FastAPI + WebSocket + React 前端。通过 Docker + PyInstaller 分发。
+**架构：** 状态机驱动的智能体核心，带有可插拔的 LLM 适配器（Anthropic/OpenAI/Mock）、三层沙箱护栏、确定性反馈分析器，以及 FastAPI + WebSocket + React 前端（Open Design / Linear 设计系统，详见 `DESIGN.md`）。通过 Docker + PyInstaller 分发。
 
 **技术栈：** Python 3.12+, FastAPI, React + Vite + TypeScript, Open Design, pytest, keyring, PyInstaller, Docker
 
@@ -74,7 +74,7 @@ lite-agent-harness/
 │       ├── credential_routes.py  # REST：凭据
 │       └── session_routes.py     # REST：会话历史
 │
-├── web/                          # 前端（React + Open Design）
+├── web/                          # 前端（React + Open Design / Linear）
 │   ├── src/
 │   │   ├── App.tsx
 │   │   ├── main.tsx
@@ -2730,7 +2730,7 @@ if static_dir.exists():
 
 由于响应长度限制，我将总结关键交付物：
 
-**任务 12（前端）**：React + Vite + TypeScript 项目。组件：ChatView（WebSocket 驱动的消息列表）、ToolCard（可折叠）、FeedbackBanner（绿色/红色/黄色）、InputBar、StateIndicator、SettingsPanel（提供者/模型/API 密钥表单）、GuardrailModal（批准/拒绝对话框）、HistorySidebar。构建输出到 `server/static/`。
+**任务 12（前端）**：React + Vite + TypeScript 项目，使用 Open Design / Linear 设计系统。组件：ChatView（WebSocket 驱动的消息列表）、ToolCard（可折叠）、FeedbackBanner（绿色/红色/黄色）、InputBar、StateIndicator、SettingsPanel（提供者/模型/API 密钥表单）、GuardrailModal（批准/拒绝对话框）、HistorySidebar。所有样式使用 Linear 的结构化 CSS 设计 token（完整 token 参考见 `DESIGN.md`）。构建输出到 `server/static/`。
 
 **任务 13（集成测试）**：使用 `httpx.AsyncClient` + `TestClient` 的 WebSocket 生命周期测试。
 

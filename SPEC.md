@@ -426,7 +426,7 @@ CI（GitHub Actions）：
 | 语言 | Python 3.12+ | Anthropic/OpenAI SDK 均 Python 优先；pytest + mock 生态成熟；开发速度快；asyncio 原生支持 WebSocket |
 | 架构 | 状态机 | 确定性最强，每个转换可独立单测；符合"移除 LLM 后仍可验证"的核心判准 |
 | Web 框架 | FastAPI | 原生 async/await；WebSocket 支持；自动 OpenAPI 文档 |
-| 前端 | React + Open Design | 生态最大，Open Design 提供设计系统和 skill；流式更新 UI 成熟 |
+| 前端 | React + Open Design（Linear 设计系统）| 生态最大，Open Design 提供 150+ 品牌级设计系统，本项目选用 Linear（暗色主题）；流式更新 UI 成熟。设计 token 详见 `DESIGN.md` |
 | LLM SDK | 官方 anthropic + openai 包 | 直接使用供应商 SDK 而非第三方封装，API 更新最及时 |
 | 测试 | pytest + pytest-asyncio | 标准选择；mock LLM 适配器注入 |
 | 前端构建 | Vite | 快速、现代、React 默认 |

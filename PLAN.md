@@ -4,7 +4,7 @@
 
 **Goal:** Build a lightweight, model-agnostic coding agent harness with deterministic guardrails, feedback loop, web UI, and mock-driven testing.
 
-**Architecture:** State-machine-driven agent core with pluggable LLM adapters (Anthropic/OpenAI/Mock), three-layer sandbox guardrails, deterministic feedback analyzer, and FastAPI + WebSocket + React frontend. Distributed via Docker + PyInstaller.
+**Architecture:** State-machine-driven agent core with pluggable LLM adapters (Anthropic/OpenAI/Mock), three-layer sandbox guardrails, deterministic feedback analyzer, and FastAPI + WebSocket + React frontend (Open Design / Linear design system, see `DESIGN.md`). Distributed via Docker + PyInstaller.
 
 **Tech Stack:** Python 3.12+, FastAPI, React + Vite + TypeScript, Open Design, pytest, keyring, PyInstaller, Docker
 
@@ -74,7 +74,7 @@ lite-agent-harness/
 │       ├── credential_routes.py  # REST: credentials
 │       └── session_routes.py     # REST: session history
 │
-├── web/                          # Frontend (React + Open Design)
+├── web/                          # Frontend (React + Open Design / Linear)
 │   ├── src/
 │   │   ├── App.tsx
 │   │   ├── main.tsx
@@ -2729,7 +2729,7 @@ These are standard tasks following the same pattern: write tests first → imple
 
 Due to response length, I'll summarize key deliverables:
 
-**Task 12 (Frontend)**: React + Vite + TypeScript project. Components: ChatView (WebSocket-driven message list), ToolCard (collapsible), FeedbackBanner (green/red/yellow), InputBar, StateIndicator, SettingsPanel (provider/model/API key forms), GuardrailModal (approve/reject dialog), HistorySidebar. Build output to `server/static/`.
+**Task 12 (Frontend)**: React + Vite + TypeScript project with Open Design / Linear design system. Components: ChatView (WebSocket-driven message list), ToolCard (collapsible), FeedbackBanner (green/red/yellow), InputBar, StateIndicator, SettingsPanel (provider/model/API key forms), GuardrailModal (approve/reject dialog), HistorySidebar. All styles use structured CSS design tokens from Linear (see `DESIGN.md` for full token reference). Build output to `server/static/`.
 
 **Task 13 (Integration tests)**: WebSocket lifecycle test using `httpx.AsyncClient` + `TestClient`.
 
