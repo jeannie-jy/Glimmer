@@ -20,15 +20,8 @@ interface FeedbackBannerProps {
 }
 
 // ---------------------------------------------------------------------------
-// Verdict colour mapping
+// Verdict labels
 // ---------------------------------------------------------------------------
-
-const VERDICT_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  pass: { bg: '#0d2818', border: '#3fb950', text: '#3fb950' },
-  fail: { bg: '#2d0a0a', border: '#f85149', text: '#f85149' },
-  warning: { bg: '#2d1f00', border: '#d29922', text: '#d29922' },
-  unknown: { bg: '#161b22', border: '#8b949e', text: '#8b949e' },
-};
 
 const VERDICT_LABELS: Record<string, string> = {
   pass: 'PASS',
@@ -49,28 +42,22 @@ const FeedbackBanner: React.FC<FeedbackBannerProps> = ({
   retryCount,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const colors = VERDICT_COLORS[verdict.toLowerCase()] || VERDICT_COLORS.unknown;
-  const label = VERDICT_LABELS[verdict.toLowerCase()] || 'UNKNOWN';
+  const verdictKey =
+    ['pass', 'fail', 'warning'].includes(verdict.toLowerCase())
+      ? verdict.toLowerCase()
+      : 'unknown';
+  const label = VERDICT_LABELS[verdictKey] || 'UNKNOWN';
   const hasDetails = failures.length > 0 || suggestedFix;
 
   return (
-    <div
-      className="feedback-banner"
-      style={{
-        borderLeftColor: colors.border,
-        backgroundColor: colors.bg,
-      }}
-    >
+    <div className={`feedback-banner feedback-banner--${verdictKey}`}>
       <button
         className="feedback-banner__header"
         onClick={() => setExpanded(!expanded)}
         type="button"
         style={{ cursor: hasDetails ? 'pointer' : 'default' }}
       >
-        <span
-          className="feedback-banner__verdict"
-          style={{ color: colors.text }}
-        >
+        <span className={`feedback-banner__verdict feedback-banner__verdict--${verdictKey}`}>
           {label}
         </span>
         <span className="feedback-banner__summary">{summary}</span>

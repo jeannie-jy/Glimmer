@@ -30,12 +30,8 @@ const ToolCard: React.FC<ToolCardProps> = ({
   const [expanded, setExpanded] = useState(false);
 
   const isSuccess = exitCode === 0;
-  const statusColor =
-    status === 'invoked'
-      ? '#d29922'
-      : isSuccess
-        ? '#3fb950'
-        : '#f85149';
+  const statusMod =
+    status === 'invoked' ? 'invoked' : isSuccess ? 'success' : 'error';
 
   return (
     <div className={`tool-card ${expanded ? 'tool-card--expanded' : ''}`}>
@@ -44,7 +40,7 @@ const ToolCard: React.FC<ToolCardProps> = ({
         onClick={() => setExpanded(!expanded)}
         type="button"
       >
-        <span className="tool-card__icon" style={{ color: statusColor }}>
+        <span className={`tool-card__icon tool-card__icon--${statusMod}`}>
           {status === 'invoked' ? '▶' : isSuccess ? '✓' : '✗'}
         </span>
         <span className="tool-card__name">{toolName}</span>
@@ -53,7 +49,7 @@ const ToolCard: React.FC<ToolCardProps> = ({
             {(durationMs / 1000).toFixed(1)}s
           </span>
         )}
-        <span className="tool-card__status" style={{ color: statusColor }}>
+        <span className={`tool-card__status tool-card__status--${statusMod}`}>
           {status === 'invoked' ? 'Running...' : `Exit ${exitCode}`}
         </span>
         <span className="tool-card__expand">
