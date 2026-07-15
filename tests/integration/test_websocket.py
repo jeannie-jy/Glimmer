@@ -56,6 +56,7 @@ def build_app(
     configure_config(config_manager, credential_manager)
     configure_credential(config_manager, credential_manager)
     ws_handler.configure(
+        app,
         config_manager=config_manager,
         credential_manager=credential_manager,
         tool_registry=tool_registry,

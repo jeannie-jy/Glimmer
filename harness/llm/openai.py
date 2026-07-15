@@ -9,7 +9,7 @@ class OpenAIAdapter(LLMAdapter):
     """Adapter for OpenAI's Chat Completions API."""
 
     def __init__(self, api_key: str, model: str = "gpt-4o"):
-        self._client = AsyncOpenAI(api_key=api_key)
+        self._client = AsyncOpenAI(api_key=api_key, timeout=60.0)
         self._model = model
 
     @staticmethod

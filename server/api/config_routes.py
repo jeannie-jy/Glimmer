@@ -74,10 +74,7 @@ async def update_config(update: ConfigUpdate) -> dict:
     current = _config_manager.load()
     updates = update.model_dump(exclude_none=True)
 
-    if "command_whitelist_extra" in updates:
-        updates["command_whitelist_extra"] = (
-            current.command_whitelist_extra + updates["command_whitelist_extra"]
-        )
+    # Replace whitelist_extra entirely (not append — prevents unbounded growth)
 
     # Write merged config to project config file
     project_cfg = _config_manager.project_root / ConfigManager.PROJECT_CONFIG_PATH

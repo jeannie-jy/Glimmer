@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from server.ws_handler import router as ws_router
+from server.ws_handler import router as ws_router, configure as configure_ws
 from server.api.config_routes import router as config_router, configure as configure_config
 from server.api.credential_routes import router as credential_router, configure as configure_credential
 from server.api.session_routes import router as session_router
@@ -40,6 +40,7 @@ def create_app(project_root: Path | None = None) -> FastAPI:
     # --- Wire up sub-routers ---
     configure_config(config_manager, credential_manager)
     configure_credential(config_manager, credential_manager)
+    configure_ws(app, config_manager=config_manager, credential_manager=credential_manager)
 
     app.include_router(ws_router)
     app.include_router(config_router, prefix="/api")

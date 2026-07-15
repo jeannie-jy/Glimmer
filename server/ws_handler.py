@@ -19,20 +19,20 @@ from harness.models import ConfigData
 
 router = APIRouter()
 
-# Shared references — set from main.py / test harness via configure()
-_components: dict = {}
-
 
 def configure(
+    app,
     config_manager: ConfigManager | None = None,
     credential_manager: CredentialManager | None = None,
     tool_registry: ToolRegistry | None = None,
     llm_override: object | None = None,
 ) -> None:
-    """Inject shared dependencies.
+    """Inject shared dependencies into app.state.
 
     Parameters
     ----------
+    app:
+        The FastAPI application to store state on.
     config_manager:
         Resolves project/global config.
     credential_manager:
@@ -42,10 +42,14 @@ def configure(
     llm_override:
         If set, every session uses this LLM adapter (useful for tests).
     """
-    _components["config_manager"] = config_manager
-    _components["credential_manager"] = credential_manager
-    _components["tool_registry"] = tool_registry
-    _components["llm_override"] = llm_override
+    if config_manager is not None:
+        app.state.ws_config_manager = config_manager
+    if credential_manager is not None:
+        app.state.ws_credential_manager = credential_manager
+    if tool_registry is not None:
+        app.state.ws_tool_registry = tool_registry
+    if llm_override is not None:
+        app.state.ws_llm_override = llm_override
 
 
 # ---------------------------------------------------------------------------
@@ -74,8 +78,10 @@ async def websocket_session(websocket: WebSocket) -> None:
     """
     await websocket.accept()
 
-    config_manager: ConfigManager | None = _components.get("config_manager")
-    credential_manager: CredentialManager | None = _components.get("credential_manager")
+    # Resolve shared components from app.state
+    app_state = websocket.app.state
+    config_manager: ConfigManager | None = getattr(app_state, 'ws_config_manager', None)
+    credential_manager: CredentialManager | None = getattr(app_state, 'ws_credential_manager', None)
 
     # ---- Wait for task.submit ----
     try:
@@ -101,7 +107,7 @@ async def websocket_session(websocket: WebSocket) -> None:
     api_key: str | None = credential_manager.load(config.model_provider)
 
     # ---- Create per-session components ----
-    tools = _components.get("tool_registry")
+    tools = getattr(app_state, 'ws_tool_registry', None)
     if tools is None:
         tools = _build_default_tool_registry()
     guardrails = GuardrailEngine(
@@ -113,7 +119,7 @@ async def websocket_session(websocket: WebSocket) -> None:
     loop = AgentLoop(tools, guardrails, analyzer, policy)
 
     # ---- Create LLM adapter ----
-    llm_override = _components.get("llm_override")
+    llm_override = getattr(app_state, 'ws_llm_override', None)
     if llm_override is not None:
         llm = llm_override  # type: ignore[assignment]
     elif api_key:

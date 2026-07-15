@@ -339,7 +339,7 @@ class AgentLoop:
                 # instead of PLANNING, to continue processing the batch
                 if session.state == State.PLANNING and pending_tool_calls:
                     prev = session.state
-                    session.state = State.EXECUTING
+                    session.state = transition(session.state, EventType.BATCH_CONTINUE)
                     await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
 
             elif session.state == State.CORRECTING:
@@ -350,9 +350,15 @@ class AgentLoop:
                 else:
                     session.retry_count += 1
                     if last_feedback:
+                        escalation_messages = [
+                            f"Previous attempt failed. {last_feedback.suggested_fix}\nPlease fix and try again.",
+                            f"Second attempt also failed. {last_feedback.suggested_fix}\nPlease be more careful this time.",
+                            f"THIRD AND FINAL ATTEMPT. {last_feedback.suggested_fix}\nIf this fails, the task will be terminated.",
+                        ]
+                        idx = min(session.retry_count - 1, len(escalation_messages) - 1)
                         session.messages.append(Message(
                             role="user",
-                            content=f"Previous attempt failed. {last_feedback.suggested_fix}\nPlease fix and try again.",
+                            content=escalation_messages[idx],
                         ))
                     prev = session.state
                     session.state = transition(session.state, EventType.RETRY)

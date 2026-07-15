@@ -1,4 +1,6 @@
 """Main feedback analyzer — strategy dispatch based on tool type."""
+import re
+from pathlib import Path
 from harness.models import ToolResult, Feedback, Verdict, Failure
 from harness.feedback.pytest_parser import parse_pytest_structured
 
@@ -56,7 +58,24 @@ class FeedbackAnalyzer:
 
     def _analyze_write(self, result: ToolResult) -> Feedback:
         if result.exit_code == 0:
-            return Feedback(verdict=Verdict.PASS, summary=result.stdout)
+            summary = result.stdout
+            # Syntax check for .py files
+            for match in re.finditer(r'(\S+\.py)\b', result.stdout or "", re.IGNORECASE):
+                py_path = match.group(1)
+                try:
+                    p = Path(py_path)
+                    if p.exists():
+                        source = p.read_text(encoding="utf-8")
+                        compile(source, str(p), "exec")
+                except SyntaxError as e:
+                    return Feedback(
+                        verdict=Verdict.FAIL,
+                        summary=f"Syntax error in {py_path}: {e}",
+                        failures=[Failure(file=py_path, message=str(e))],
+                    )
+                except Exception:
+                    pass  # file may not exist yet or other transient errors
+            return Feedback(verdict=Verdict.PASS, summary=summary)
         return Feedback(
             verdict=Verdict.FAIL,
             summary=result.stderr or "File write failed",

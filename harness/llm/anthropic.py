@@ -9,7 +9,7 @@ class AnthropicAdapter(LLMAdapter):
     """Adapter for Anthropic's Messages API."""
 
     def __init__(self, api_key: str, model: str = "claude-sonnet-5-20251001"):
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
+        self._client = anthropic.AsyncAnthropic(api_key=api_key, timeout=60.0)
         self._model = model
 
     @staticmethod

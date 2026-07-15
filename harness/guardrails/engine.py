@@ -26,6 +26,13 @@ class GuardrailEngine:
             if result.action != GuardAction.ALLOW:
                 return result
 
+        # Layer 1 also: Path sandbox for run_tests path
+        if tool_call.name == "run_tests":
+            test_path = tool_call.arguments.get("path", "tests/") or "tests/"
+            result = self._path_sandbox.validate(test_path, "read")
+            if result.action != GuardAction.ALLOW:
+                return result
+
         # Layer 2 & 3: Command safety for shell execution
         if tool_call.name in ("execute_shell", "run_tests"):
             command = tool_call.arguments.get("command", "")

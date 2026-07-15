@@ -20,6 +20,7 @@ class EventType(str, Enum):
     RETRY = "retry"
     MAX_RETRIES = "max_retries"
     ERROR = "error"
+    BATCH_CONTINUE = "batch_continue"
 
 
 # State transition table: (current_state, event) -> next_state
@@ -43,6 +44,9 @@ TRANSITIONS: dict[tuple[State, EventType], State] = {
 
     (State.CORRECTING, EventType.RETRY): State.PLANNING,
     (State.CORRECTING, EventType.MAX_RETRIES): State.COMPLETED,
+
+    (State.PLANNING, EventType.BATCH_CONTINUE): State.EXECUTING,
+    (State.OBSERVING, EventType.BATCH_CONTINUE): State.EXECUTING,
 
     (State.ERROR, EventType.TASK_SUBMIT): State.PLANNING,
 }
