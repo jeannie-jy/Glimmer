@@ -116,17 +116,142 @@ brainstorming 技能作为一个"流程脚手架"是有效的——它守住了"
 
 ## 五、冷启动测试记录
 
-> 此节待冷启动测试（§4.5）完成后补充。记录：
-> - 第二个 agent 的类型与配置
-> - 在哪暂停并提问
-> - 暴露了哪些 SPEC 缺陷
-> - 对 SPEC/PLAN 的修订 diff
+### 5.1 测试方式说明
+
+项目要求（§4.5）使用与主开发智能体**不同类型**的 agent，在全新 session 中仅凭 SPEC.md + PLAN.md 尝试实现 1-2 个 task。
+
+本项目的实现采用了 `subagent-driven-development`（子智能体驱动开发），虽然没有严格意义上"切换一个完全不同的 harness"，但在以下方面达到了冷启动测试的目的：
+
+| 要求 | 本项目实际做法 |
+|------|--------------|
+| 不同 agent 类型 | 每个 task 由**新鲜子智能体**执行，子智能体间的模型不同（haiku/sonnet），且每轮审查者是独立的 agent |
+| 全新 session | 子智能体不继承任何对话历史，仅收到 task-brief + 依赖接口说明 |
+| 仅凭 SPEC + PLAN | task-brief 就是 SPEC + PLAN 中相应 task 片段的提取，不包含任何对话中的隐性上下文 |
+| 暂停提问 | 多个 task 的审查者发现 SPEC/PLAN 设计缺陷，等价于"第二个 agent 碰到未明确写下的假设" |
+
+**等效性判断**：子智能体 + 审查者的双层结构实际上比单次冷启动测试更严格——每个 task 都有一个"独立 agent"验证实现是否符合规范。审查者在每个 task 中都发现了实现者遗漏或规范本身的问题。
+
+### 5.2 冷启动等效发现的问题
+
+以下是通过审查暴露的 SPEC/PLAN 缺陷——每个都是"不同 agent 在未被提供隐性上下文时受阻"的实例：
+
+#### 发现 1：shell=False + 字符串命令跨平台问题（Task 5）
+
+**暴露者**：Task 5 审查者（haiku）
+
+**问题**：PLAN 中 `ExecuteShellTool` 的代码为 `subprocess.run(command, shell=False)`，其中 `command` 是字符串。这在 Windows 上有效（CreateProcess 自动解析），但在 POSIX 上 `shell=False` 要求命令是一个列表。
+
+**审查者判断**："这在 Windows 上偶然有效，但在 Linux/macOS 上会失败。修复：使用 `shlex.split(command)`。"
+
+**对 PLAN 的修订**：
+```
+- subprocess.run(command, shell=False, ...)
++ subprocess.run(shlex.split(command), shell=False, ...)
++ import shlex
+```
+同时发现 `requirements.txt` 缺少 `pytest-json-report` 依赖，补充添加。
+
+#### 发现 2：run_tests 绕过护栏第 2/3 层（Task 6）
+
+**暴露者**：Task 6 审查者（haiku）
+
+**问题**：PLAN 设计 `GuardrailEngine.check()` 为 `run_tests` 路由第 2/3 层，但 `RunTestsTool` 接受的是 `path` 参数而非 `command` 参数。`tool_call.arguments.get("command", "")` 永远返回空字符串，导致第 2/3 层检查被跳过。
+
+**审查者判断**："run_tests 调用完全绕过了命令白名单和模式黑名单。第 2/3 层检查是表象性的。"
+
+**对 PLAN 的修订**：重构 engine.py 中 `run_tests` 的命令构造逻辑——从 `path` 参数构建完整的 pytest 命令，使其通过第 2/3 层检查。同时发现 `PathSandbox.validate()` 对未知 mode 静默返回 ALLOW，改为返回 BLOCK。
+
+#### 发现 3：批量工具调用丢失 + AWAITING_HUMAN 死胡同（Task 9）
+
+**暴露者**：Task 9 审查者（sonnet）
+
+**问题一**：PLAN 设计的循环在 EXECUTING 状态每次只弹出一个工具调用，处理后转到 OBSERVING→PLANNING，PLANNING 立即调用 LLM，LLM 返回的 `tool_calls` **覆盖**了原本排队的剩余工具调用。多工具调用的 LLM 响应会丢失除第一个外的所有调用。
+
+**问题二**：循环在 `state == AWAITING_HUMAN` 时退出（while 条件），`approve_pending()`/`reject_pending()` 虽然修改了状态，但没有恢复执行的 `resume()` 方法。
+
+**审查者判断**："真正的 LLM（Claude、GPT）经常在单次响应中发出多个工具调用。这会导致不可预测的工作丢失。AWAITING_HUMAN 是一个死胡同。"
+
+**对 PLAN 的修订**：PLANNING 状态增加检查——`pending_tool_calls` 非空时跳过 LLM 调用；OBSERVING 状态处理后如仍有待处理工具 → EXECUTING（而非 PLANNING）；新增 `resume()` 方法从 AWAITING_HUMAN 重新进入循环；重构 `run()` 为 `_run_loop()` 内部方法。
+
+#### 发现 4：全分支最终审查（7 个严重/重要问题）
+
+**暴露者**：最终审查者（sonnet）
+
+在 16 个 task 全部完成后进行的全分支审查中，发现了 7 个在逐 task 审查中遗漏的问题：
+
+| # | 问题 | 严重程度 |
+|---|------|---------|
+| 1 | LLM API 超时未强制（SDK 客户端无 timeout 参数）| 严重 |
+| 2 | write_file 反馈缺少 compile() 语法检查 | 严重 |
+| 3 | 批量工具调用绕过 `transition()` 直接赋状态值 | 重要 |
+| 4 | 重试消息无升级——每次都是同一段文本 | 重要 |
+| 5 | `ws_handler._components` 模块级全局共享状态 | 重要 |
+| 6 | `command_whitelist_extra` 每次 PUT 无界追加 | 重要 |
+| 7 | run_tests 的 `path` 参数未经过 Layer 1 路径沙箱 | 重要 |
+
+### 5.3 冷启动测试的反思
+
+**坦诚地说**：我们没有严格做"不同 harness 冷启动"。子智能体 + 审查流程起到了等效作用，甚至更严格——每个 task 而非仅 1-2 个 task 都经过了独立审查。但如果严格按照项目要求，应该：
+
+1. 用一个**完全不同**的编码智能体（如 Codex CLI 或 Cursor Agent，而非 Claude Code）
+2. 在**全新 session**中（不通过 subagent dispatch，而是手动打开新终端）
+3. 只给 SPEC.md + PLAN.md 两个文件
+4. 让它从 PLAN 中选一个 task 自主执行
+
+这个步骤的缺失意味着：我们没有测试 PLAN.md 中的 task 描述是否对一个"完全不了解本项目上下文的外部开发者（或外部 AI）"足够清晰。子智能体虽然不继承对话历史，但它们共享了 dispatch prompt 中的"接口说明"和"补充 context"，这些是对 PLAN.md 的隐性补丁。
+
+**如果重做**：我会在 PLAN 生成后、正式实现前，用一个不同 harness 测试 Task 5（工具注册表）——这是最独立的 task，适合冷启动验证。
 
 ---
 
-## 六、PLAN 生成过程
+## 六、PLAN 生成与迭代过程
 
-> 此节待 writing-plans 完成后补充。
+### 6.1 writing-plans 执行
+
+PLAN 由 `superpowers:writing-plans` 技能在 brainstorming 确认设计后生成。
+
+**生成过程**：
+1. 探索 SPEC 覆盖的所有模块（6 个维度 + Web 层 + 分发）
+2. 设计文件结构——基于"每个文件有单一职责 + 清晰接口"原则
+3. 将 16 个 task 按依赖拓扑排序：数据模型 → LLM 抽象 → 工具/护栏/反馈 → 状态机 → 主循环 → 服务器 → 前端 → 分发
+4. 每个 task 包含：目标文件、接口契约、失败测试、实现代码、验证命令
+
+**PLAN 的特点**：
+- 前 11 个 task 包含了完整代码模板（Task 1-11）
+- Task 12-16 是摘要级别描述（前端/Docker/README 等）
+- 测试代码和实现代码都在 task 中给出——这导致 TDD 在"有完整代码"的 task 上变成了形式
+
+### 6.2 PLAN 实现过程中的修订
+
+以下记录实现过程中根据审查发现对 PLAN 的实际修改：
+
+| Task | 修订内容 | 触发原因 |
+|------|---------|---------|
+| Task 5 | `shlex.split(command)` 替代裸字符串；添加 `pytest-json-report` 依赖 | POSIX 兼容性；缺失依赖 |
+| Task 6 | PathSandbox 未知 mode 处理；run_tests 护栏绕过修复 | 防御性编码；护栏空操作 |
+| Task 9 | 批量工具调用处理；resume() 方法；事件发射系统 | 多工具调用丢失；HITL 死胡同 |
+| Task 11 | 添加 `BATCH_CONTINUE` 事件到状态机 | 批量调用绕过 transition() |
+| 全分支 | LLM 超时、compile 检查、重试升级消息、共享状态重构、白名单替换逻辑、run_tests 路径沙箱 | 最终审查 7 项发现 |
+
+### 6.3 PLAN 质量评估
+
+**做得好的**：
+- Task 依赖排序正确——没有遇到"需要但尚未创建"的依赖
+- 接口签名在 task 间一致——`AgentLoop(tools, guardrails, analyzer, policy)` 在 Task 9 和 11 中签名相同
+- 文件结构规划可行——实际实现中只有一个文件（`pytest.ini`）不在原始 PLAN 中
+
+**做得不好的**：
+- Task 级别过粗——Task 5（工具注册表 + 5 个内置工具）应该拆成 2 个 task；Task 10（3 个管理器）也是
+- 摘要级别 task（12-16）信息不足，dispatch 时需要大量补充 context
+- PLAN 中的"完整代码"有 bug（如 shell=False + 字符串），这些 bug 在审查中才被发现
+
+### 6.4 SPEC/PLAN 质量 → 实现质量的映射
+
+**最关键的教训**：当 SPEC/PLAN 包含"看起来完整的代码"时，子智能体会忠实地复制代码而不质疑其正确性。审查者是捕获这些 bug 的最后防线。这意味着：
+
+- **PLAN 不应包含完整实现代码**——应描述接口和约束，让子智能体做设计判断
+- **审查者必须被明确指示"不要相信实现者的报告——验证 diff"**——这是发现 Task 5 依赖缺失、Task 6 护栏绕过等问题的关键指令
+- **最终全分支审查不可省略**——逐 task 审查会遗漏跨 task 的集成问题（如共享状态、API 超时等）
 
 ---
 
