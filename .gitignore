@@ -33,4 +33,5 @@ __pycache__/
 .pytest_cache/
 web/dist/
 web/node_modules/
-*.spec
+# pyinstaller.spec is tracked intentionally
+!pyinstaller.spec
