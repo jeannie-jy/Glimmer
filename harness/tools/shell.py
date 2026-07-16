@@ -10,9 +10,11 @@ from harness.models import ToolResult
 class ExecuteShellTool(Tool):
     """Execute a shell command in a sandboxed subprocess."""
 
-    def __init__(self, cwd: Path | None = None, timeout: int = 30):
+    def __init__(self, cwd: Path | None = None, timeout: int = 30, docker_mgr=None, container_id=None):
         self._cwd = cwd
         self._timeout = timeout
+        self._docker_mgr = docker_mgr
+        self._container_id = container_id
 
     @property
     def name(self) -> str:
@@ -36,6 +38,18 @@ class ExecuteShellTool(Tool):
     async def execute(self, arguments: dict) -> ToolResult:
         start = time.time()
         command = arguments["command"]
+
+        # Docker execution path
+        if self._docker_mgr and self._container_id:
+            result = await self._docker_mgr.exec(self._container_id, command, timeout=self._timeout)
+            return ToolResult(
+                tool_name="execute_shell",
+                exit_code=result.exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                duration_ms=int((time.time() - start) * 1000),
+            )
+
         cwd = Path(arguments.get("cwd", str(self._cwd or Path.cwd())))
 
         try:
@@ -73,9 +87,11 @@ class ExecuteShellTool(Tool):
 class RunTestsTool(Tool):
     """Run pytest and collect structured results."""
 
-    def __init__(self, cwd: Path | None = None, timeout: int = 60):
+    def __init__(self, cwd: Path | None = None, timeout: int = 60, docker_mgr=None, container_id=None):
         self._cwd = cwd
         self._timeout = timeout
+        self._docker_mgr = docker_mgr
+        self._container_id = container_id
 
     @property
     def name(self) -> str:
@@ -100,6 +116,19 @@ class RunTestsTool(Tool):
         import tempfile
         start = time.time()
         test_path = arguments.get("path", "tests/")
+
+        # Docker execution path
+        if self._docker_mgr and self._container_id:
+            cmd = f"python -m pytest {test_path} -v 2>&1"
+            result = await self._docker_mgr.exec(self._container_id, cmd, timeout=self._timeout)
+            return ToolResult(
+                tool_name="run_tests",
+                exit_code=result.exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                duration_ms=int((time.time() - start) * 1000),
+            )
+
         cwd = self._cwd or Path.cwd()
 
         # Use pytest's JSON report for structured output

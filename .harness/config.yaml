@@ -1,17 +1,16 @@
-model:
-  provider: anthropic
-  model_id: claude-sonnet-5
-  max_tokens: 4096
-
-guardrails:
-  max_retries: 3
-  sandbox_root: .
-  command_whitelist_extra: []
-  timeout_seconds: 30
-
-tools:
-  enabled: [read_file, write_file, execute_shell, run_tests, search_code]
-
-memory:
-  max_context_tokens: 8000
-  learnings_limit: 20
+base_url: https://njusehub.info/v1
+command_whitelist_extra: []
+enabled_tools:
+- read_file
+- write_file
+- execute_shell
+- run_tests
+- search_code
+learnings_limit: 20
+max_context_tokens: 8000
+max_retries: 3
+max_tokens: 4096
+model_id: qwen-turbo
+model_provider: openai
+sandbox_root: .
+timeout_seconds: 30

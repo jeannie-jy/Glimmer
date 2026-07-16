@@ -1,6 +1,6 @@
 # SPEC_PROCESS.md：规约生成过程文档
 
-> 记录使用 Superpowers brainstorming 技能生成 lite-agent-harness 规约的完整过程。
+> 记录使用 Superpowers brainstorming 技能生成 glimmer 规约的完整过程。
 
 ---
 

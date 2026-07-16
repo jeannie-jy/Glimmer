@@ -1,151 +1,86 @@
-/* Design System: Linear (via Open Design)
-   https://github.com/nexu-io/open-design */
-
-/* =========================================================================
-   Design Tokens
-   ========================================================================= */
+/* Design System: Fairy-Tale Dream Theme */
 
 :root {
-  /* ---- Colors (Semantic) ---- */
-  --color-bg-app: #0d1117;
-  --color-bg-surface: #161b22;
-  --color-bg-element: #1c2128;
-  --color-bg-elevated: #2a3038;
-  --color-bg-input: #0d1117;
+  --color-bg-primary: #fefaf5;
+  --color-bg-surface: #ffffff;
+  --color-bg-element: #fff0f5;
+  --color-bg-elevated: #ffeef2;
+  --color-bg-input: #fff5f7;
 
-  --color-text-primary: #e6edf3;
-  --color-text-secondary: #8b949e;
-  --color-text-tertiary: #6e7681;
+  --color-accent: #f8a4c8;
+  --color-accent-hover: #f595b8;
+  --color-glow: #ffd6e8;
+  --color-sparkle: #ffe4ec;
 
-  --color-border-base: #30363d;
-  --color-border-muted: #21262d;
+  --color-text-primary: #3d2c2c;
+  --color-text-secondary: #8c7575;
+  --color-text-tertiary: #b8a0a0;
 
-  --color-accent-primary: #58a6ff;
-  --color-accent-hover: #79c0ff;
+  --color-status-success: #7ecb9a;
+  --color-status-error: #e88b8b;
+  --color-status-warning: #e8c48b;
 
-  --color-status-success: #3fb950;
-  --color-status-error: #f85149;
-  --color-status-warning: #d29922;
+  --color-border-base: #f0e6e8;
 
-  /* Status backgrounds (alpha) */
-  --color-bg-success: rgba(63, 185, 80, 0.1);
-  --color-bg-error: rgba(248, 81, 73, 0.1);
-  --color-bg-warning: rgba(210, 153, 34, 0.1);
+  --gradient-hero: linear-gradient(180deg, #fefaf5 0%, #fff0f3 40%, #ffeef2 100%);
+  --gradient-title: linear-gradient(135deg, #e8879b, #f8a4c8, #d4859e);
+  --gradient-fairy: linear-gradient(135deg, #f8a4c8, #ffd6e8);
+  --gradient-card-glow: radial-gradient(circle at center, rgba(248,164,200,0.15) 0%, transparent 70%);
 
-  /* ---- Spacing (4px scale) ---- */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 28px;
-  --space-8: 32px;
+  --shadow-sm: 0 1px 3px rgba(61, 44, 44, 0.04);
+  --shadow-md: 0 4px 16px rgba(61, 44, 44, 0.06);
+  --shadow-lg: 0 12px 40px rgba(61, 44, 44, 0.08);
+  --shadow-glow: 0 8px 30px rgba(248, 164, 200, 0.2);
 
-  /* ---- Typography ---- */
-  --text-xs: 11px;
-  --text-sm: 12px;
-  --text-base: 14px;
-  --text-lg: 16px;
-  --text-xl: 18px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-7: 28px; --space-8: 32px;
 
-  --font-regular: 400;
-  --font-medium: 500;
-  --font-semibold: 600;
-  --font-bold: 700;
+  --text-xs: 11px; --text-sm: 13px; --text-base: 15px; --text-lg: 18px;
+  --text-xl: 22px; --text-2xl: 28px;
+  --text-hero: clamp(4.5rem, 12vw, 8rem);
+  --text-tagline-en: clamp(1.2rem, 2.5vw, 1.8rem);
+  --text-tagline-zh: clamp(1rem, 1.5vw, 1.3rem);
 
-  --leading-tight: 1.25;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.6;
+  --font-display: 'Great Vibes', cursive;
+  --font-tagline: 'Noto Serif SC', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* ---- Radii ---- */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --font-regular: 400; --font-medium: 500; --font-semibold: 600; --font-bold: 700;
+  --leading-tight: 1.25; --leading-normal: 1.5; --leading-relaxed: 1.6;
 
-  /* ---- Shadows ---- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.4);
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 20px; --radius-full: 9999px;
 
-  /* ---- Transitions ---- */
+  --magic-float-duration: 8s;
+  --magic-sparkle-duration: 2s;
+  --magic-sweep-interval: 6s;
+  --magic-sweep-duration: 1.5s;
+  --magic-breathe: 3s ease-in-out infinite;
+
   --transition-fast: 150ms;
   --transition-normal: 250ms;
 }
 
-/* =========================================================================
-   Reset
-   ========================================================================= */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-}
+html, body { height: 100%; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-body);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   color: var(--color-text-primary);
-  background: var(--color-bg-app);
+  background: var(--color-bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#root {
-  height: 100%;
-}
+#root { height: 100%; }
 
-/* =========================================================================
-   Scrollbar
-   ========================================================================= */
+::-webkit-scrollbar { width: var(--space-2); height: var(--space-2); }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border-base); border-radius: var(--radius-sm); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-tertiary); }
 
-::-webkit-scrollbar {
-  width: var(--space-2);
-  height: var(--space-2);
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-border-base);
-  border-radius: var(--radius-sm);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-tertiary);
-}
-
-/* =========================================================================
-   Focus visible
-   ========================================================================= */
-
-:focus-visible {
-  outline: 2px solid var(--color-accent-primary);
-  outline-offset: 2px;
-}
-
-button:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* =========================================================================
-   Selection
-   ========================================================================= */
-
-::selection {
-  background: var(--color-accent-primary);
-  color: #fff;
-}
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+button:focus:not(:focus-visible) { outline: none; }
+::selection { background: var(--color-accent); color: #fff; }

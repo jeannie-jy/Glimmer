@@ -1,6 +1,6 @@
 # AGENT_LOG.md：智能体实现过程日志
 
-> 记录使用 Superpowers subagent-driven-development 技能实现 lite-agent-harness 的完整过程。
+> 记录使用 Superpowers subagent-driven-development 技能实现 Glimmer 的完整过程。
 
 ## 环境
 
@@ -27,145 +27,84 @@
 - 前端：React + FastAPI WebSocket
 - 分发：Docker + PyInstaller
 
-**产出**：`docs/superpowers/specs/2026-07-15-lite-agent-harness-design.md`（503 行）、`docs/superpowers/plans/2026-07-15-lite-agent-harness.md`（2754 行）
+**产出**：`docs/superpowers/specs/2026-07-15-lite-agent-harness-design.md`、`docs/superpowers/plans/2026-07-15-lite-agent-harness.md`
 
 ---
 
-### 2026-07-15：实现阶段（subagent-driven-development）
+### 2026-07-15：核心实现阶段
 
 **触发的技能**：`superpowers:subagent-driven-development`
 
-#### Task 1: 项目脚手架
-- **子智能体**：haiku
-- **提交**：`5df9f94`
-- **内容**：requirements.txt, Makefile, .harness/config.yaml, .gitignore
-- **审查结果**：✅ 规范合规，无问题
-- **耗时**：~3 分钟
+Tasks 1-16 实现了完整 harness 内核、FastAPI 服务端、React 前端、演示脚本和文档。
 
-#### Task 2: 核心数据模型
-- **子智能体**：haiku
-- **提交**：`e0775a5`
-- **内容**：14 个 Pydantic 模型 + 3 个枚举 + conftest fixtures
-- **审查结果**：✅ 规范合规，轻微问题（未使用的 `Any` 导入）
-- **耗时**：~2 分钟
+---
 
-#### Task 3: LLM 抽象层 — 接口 + Mock
-- **子智能体**：haiku
-- **提交**：`32f93fb`
-- **内容**：LLMAdapter ABC, MockLLMAdapter, 4 个异步测试
-- **偏差**：需添加 pytest.ini（asyncio_mode=auto）和 tests/unit/__init__.py
-- **审查结果**：✅ 规范合规，偏差合理
-- **耗时**：~3 分钟
+### 2026-07-16：童话主题前端改版
 
-#### Task 4: Anthropic + OpenAI 适配器
-- **子智能体**：haiku
-- **提交**：`1159a90`
-- **内容**：AnthropicAdapter, OpenAIAdapter
-- **审查结果**：✅ 通过，轻微问题（`import json` 在循环内）
-- **耗时**：~1 分钟
+**触发的技能**：`superpowers:brainstorming` → `superpowers:writing-plans` → `superpowers:subagent-driven-development`
 
-#### Task 5: 工具注册表 + 内置工具
-- **子智能体**：haiku
-- **提交**：`eebfb68`，修复：`cbeded7`
-- **内容**：Tool ABC, ToolRegistry, 5 个内置工具
-- **审查发现**：shell=False 与字符串命令不兼容 POSIX（已修复：shlex.split），缺少 pytest-json-report 依赖（已修复）
-- **人工干预**：要求修复以上两个问题
-- **耗时**：~5 分钟（含修复）
+**关键决策**：
+- 从暗色 Linear 主题彻底转换为童话梦幻风格
+- 粉白配色（`#fefaf5` 背景，`#f8a4c8` 主色调），零紫色零金色
+- Great Vibes 手写体标题 + Noto Serif SC 中文艺术字
+- Canvas 2D 重写粒子系统：仅细碎圆点（≤1.5px），闪粉掠过标题，仙女挥棒爆发
+- Framer Motion 仙女椭圆轨道动画 + 魔法棒闪烁
+- 项目从 "Lite Agent Harness" 更名为 **Glimmer**
+- DemoChat 组件：主页动态代码生成演示窗
+- Lucide React SVG 图标替代所有 emoji
+- Settings 面板简化：Provider + Base URL + Model + API Key 四合一
 
-#### Task 6: 三层护栏
-- **子智能体**：haiku
-- **提交**：`a6fdac6`，修复：`7ffa2f3`
-- **内容**：PathSandbox, CommandWhitelist, PatternBlacklist, GuardrailEngine
-- **审查发现**：未知 mode 静默放行（已修复），run_tests 绕过第 2/3 层检查（已修复）
-- **人工干预**：要求修复以上两个 bug
-- **耗时**：~5 分钟（含修复）
+**产出**：`docs/superpowers/specs/2026-07-16-fairy-tale-theme-redesign.md`、`docs/superpowers/plans/2026-07-16-fairy-tale-theme-redesign.md`
 
-#### Task 7: 反馈分析器
-- **子智能体**：haiku
-- **提交**：`65b49af`
-- **内容**：FeedbackAnalyzer, pytest_parser, RetryPolicy
-- **审查结果**：✅ 规范合规，无问题
-- **耗时**：~2 分钟
+**7 次提交**，39 个文件变更。
 
-#### Task 8: 状态机引擎
-- **子智能体**：haiku
-- **提交**：`8a1680f`
-- **内容**：EventType 枚举, 转换表, transition() 纯函数
-- **审查结果**：✅ 规范合规，12/12 测试通过
-- **耗时**：~1 分钟
+---
 
-#### Task 9: Agent 主循环（**最复杂任务**）
-- **子智能体**：sonnet（提高模型等级）
-- **提交**：`9fff1b4`，修复：后续提交
-- **内容**：AgentLoop.run(), 集成测试
-- **审查发现（严重）**：批量工具调用丢失、AWAITING_HUMAN 死胡同
-- **人工干预**：要求修复两个严重 bug，重构为 _run_loop() + resume()
-- **耗时**：~10 分钟（含修复）
+### 2026-07-16：多用户部署架构
 
-#### Task 10: 记忆/配置/凭据管理器
-- **子智能体**：haiku
-- **提交**：`250fcf9`
-- **内容**：MemoryManager, ConfigManager, CredentialManager，42 个测试
-- **审查结果**：✅ 通过，轻微文档/设计问题
-- **耗时**：~7 分钟
+**触发的技能**：`superpowers:brainstorming` → `superpowers:writing-plans` → `superpowers:subagent-driven-development`
 
-#### Task 11: FastAPI 服务器 + WebSocket
-- **子智能体**：sonnet
-- **提交**：后续提交
-- **内容**：server/main.py, ws_handler.py, REST 路由，7 个 WebSocket 集成测试
-- **关键设计**：事件发射系统，WebSocket 生命周期管理
-- **耗时**：~17 分钟
+**关键决策**：
+- GitHub OAuth 登录（无密码管理）
+- JWT 鉴权（所有 API/WebSocket 路由保护）
+- PostgreSQL 持久化（用户、配置、会话、消息）
+- Docker 容器沙箱（每会话独立容器，无网络，512MB 内存限制）
+- AES-256-GCM 加密存储 API Key
+- 前端相对 URL + AuthContext + LoginPage + ProtectedRoute
+- Nginx 反代 + slowapi 限流 + docker-compose 一键部署
+- 保留本地单用户模式（无 DATABASE_URL 时自动降级）
 
-#### Task 12: React 前端
-- **子智能体**：sonnet
-- **提交**：后续提交
-- **内容**：22 个源文件，10 个组件，暗色主题，WebSocket hooks
-- **耗时**：~7 分钟
+**产出**：`docs/superpowers/specs/2026-07-16-multi-user-deployment-design.md`、`docs/superpowers/plans/2026-07-16-multi-user-deployment.md`
 
-#### Task 14: 演示脚本
-- **子智能体**：haiku
-- **提交**：`88a5ac1`
-- **内容**：demo_guardrail.py, demo_sandbox.py, demo_feedback_loop.py
-- **耗时**：~2 分钟
+**8 次提交**，16 个新文件，12 个文件修改。
 
-#### Task 15: Docker + PyInstaller
-- **子智能体**：haiku
-- **提交**：`37c3e16`
-- **内容**：Dockerfile（多阶段），pyinstaller.spec
-- **耗时**：~1 分钟
+---
 
-#### Task 16: README + 文档
-- **子智能体**：haiku
-- **提交**：`6b93e81`，后续：`839a7ef`（中文版）
-- **内容**：完整 README.md + README.zh.md（双语切换）
-- **耗时**：~5 分钟
+## 当前状态
 
-#### Task 17: Open Design 集成（后期补充）
-- **子智能体**：sonnet
-- **提交**：`28394b5`
-- **内容**：将前端从纯手写 CSS 升级为 Open Design 的 Linear 设计系统。重写 `index.css` 为结构化的 design token 体系（颜色/间距/字体/圆角/阴影/过渡），所有组件改用 CSS 变量引用，新增 `DESIGN.md` 记录完整 token 参考
-- **触发原因**：项目要求文档明确规定"凡涉及前端 / UI，强烈推荐使用 Open Design 进行界面开发，并在 SPEC 中说明所选设计系统与 skill"
-- **耗时**：~4 分钟
-
-#### 最终审查与修复
-- **子智能体**：sonnet
-- **提交**：`f8d8bb5`
-- **修复内容**：7 个严重/重要问题（LLM 超时、compile 检查、批量绕过、重试升级消息、共享状态、白名单无界追加、run_tests 路径沙箱）
-- **审查结果**：全分支审查通过，94/94 测试
+| 指标 | 值 |
+|------|-----|
+| 总提交数 | 30+ |
+| Python 测试 | 94+ |
+| 前端页面 | 6（Home / About / Guide / Learn / Agent / Login） |
+| 支持 LLM | Anthropic + 任意 OpenAI 兼容（DeepSeek / Qwen / Ollama / vLLM） |
+| 部署方式 | 本地单用户 / docker-compose 多用户 |
+| 设计语言 | Fairy-Tale Dream（粉白童话） |
+| 项目名称 | Glimmer |
 
 ---
 
 ## 学到的教训
 
-1. **批量工具调用处理**：最初的实现只处理第一个工具调用，然后重新调用 LLM 覆盖了等待列表。这是一个原型中容易遗漏但真实 LLM 在单次响应中返回多个工具调用时会导致静默数据丢失的 bug。
+1. **审查循环的价值**：每个任务的审查者都发现了实现者遗漏的问题——通常是规范本身的设计缺陷。
 
-2. **审查循环的价值**：每个任务的审查者都发现了实现者遗漏的问题——通常是实现者"忠实遵循规范"导致规范本身设计缺陷的问题（如 `shlex.split` 问题、`run_tests` 绕过护栏）。
+2. **模型选择很重要**：haiku 在机械任务上表现出色，sonnet 在复杂集成任务上是必需的。
 
-3. **模型选择很重要**：haiku 在机械的"复制规范代码"任务上表现出色（1-2 分钟）。sonnet 在复杂的需要判断的集成任务上是必需的——主循环花了 10 分钟并需要大量重构。
+3. **文件存储可靠性**：Windows keyring 的行为不可预测——始终以文件为主要存储，keyring 作为辅助。
 
-4. **事件发射与状态机**：向 loop.py 添加事件系统最初被认为是一个实现细节，但成为了连接 WebSocket 处理程序的关键接口。应在规范中明确设计。
+4. **前端 URL 硬编码**：localhost 硬编码在部署到生产环境时会直接崩溃。从第一天就应使用相对 URL。
 
-5. **双语 README**：用户要求在最后添加中英文 README 切换功能。这是一项小改动，但显著改善了可访问性。在这些细节被明确提出之前就预见到会更好。
+5. **凭证管理的人机工程学**：对于本地工具，文件存储比加密方案更用户友好。
 
 ---
 

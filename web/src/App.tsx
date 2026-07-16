@@ -1,127 +1,49 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { useWebSocket } from './hooks/useWebSocket';
-import { useSession, type AgentState } from './hooks/useSession';
-import ChatView from './components/ChatView';
-import HistorySidebar from './components/HistorySidebar';
-import SettingsPanel from './components/SettingsPanel';
-import GuardrailModal from './components/GuardrailModal';
-import './App.css';
+import React from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
+import NavBar from './components/NavBar';
+import ParticleCanvas from './components/ParticleCanvas';
+import HomePage from './pages/HomePage';
+import AboutPage from './pages/AboutPage';
+import GuidePage from './pages/GuidePage';
+import LearnPage from './pages/LearnPage';
+import AgentPage from './pages/AgentPage';
+import LoginPage from './pages/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './contexts/AuthContext';
+import './styles/magic-animations.css';
+import './styles/nav.css';
 
-// ---------------------------------------------------------------------------
-// App
-// ---------------------------------------------------------------------------
+const GITHUB_URL = 'https://github.com/jingyu-wang/lite-agent-harness';
+
+const GitHubRedirect: React.FC = () => {
+  React.useEffect(() => {
+    window.location.href = GITHUB_URL;
+  }, []);
+  return null;
+};
 
 const App: React.FC = () => {
-  const {
-    send,
-    messages,
-    isConnected,
-    connect,
-    disconnect,
-    error: wsError,
-  } = useWebSocket();
-
-  const [task, setTask] = useState('');
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const taskSubmittedRef = useRef(false);
-
-  const { state, pendingGuardrail } = useSession(messages, task);
-
-  const isRunning = ['planning', 'executing', 'observing', 'correcting'].includes(state);
-
-  // ---- Send task ----
-  const handleSend = useCallback(
-    (text: string) => {
-      setTask(text);
-      taskSubmittedRef.current = true;
-      connect();
-      // Small delay to let the connection open
-      setTimeout(() => {
-        send({ type: 'task.submit', content: text });
-      }, 200);
-    },
-    [connect, send],
-  );
-
-  // ---- Cancel session ----
-  const handleStop = useCallback(() => {
-    send({ type: 'session.cancel' });
-    disconnect();
-  }, [send, disconnect]);
-
-  // ---- Guardrail actions ----
-  const handleGuardrailApprove = useCallback(() => {
-    send({ type: 'guardrail.approve' });
-  }, [send]);
-
-  const handleGuardrailReject = useCallback(() => {
-    send({ type: 'guardrail.reject' });
-  }, [send]);
-
-  // ---- Determine state for ChatView ----
-  const chatState: AgentState =
-    state === 'idle' && !task
-      ? 'idle'
-      : state;
-
-  // ---- Connected / awaiting status for UI ----
-  const awaitingHuman = state === 'awaiting_human';
+  const location = useLocation();
 
   return (
-    <div className="app">
-      {/* Left sidebar — History */}
-      <aside className="app__sidebar app__sidebar--left">
-        <HistorySidebar />
-      </aside>
-
-      {/* Main — Chat */}
-      <main className="app__main">
-        <ChatView
-          messages={messages}
-          state={chatState}
-          onSend={handleSend}
-          onStop={handleStop}
-        />
-
-        {/* WebSocket error banner */}
-        {wsError && (
-          <div className="app__error-banner">{wsError}</div>
-        )}
-
-        {/* Connection status */}
-        {!isConnected && taskSubmittedRef.current && state !== 'completed' && state !== 'error' && (
-          <div className="app__connecting">
-            Connecting...
-          </div>
-        )}
-
-        {/* Awaiting human indicator */}
-        {awaitingHuman && (
-          <div className="app__awaiting-banner">
-            Agent is waiting for your approval.
-          </div>
-        )}
+    <AuthProvider>
+      <ParticleCanvas />
+      <NavBar />
+      <main style={{ paddingTop: 56, minHeight: '100vh' }}>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/guide" element={<GuidePage />} />
+            <Route path="/learn" element={<LearnPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
+            <Route path="/github" element={<GitHubRedirect />} />
+          </Routes>
+        </AnimatePresence>
       </main>
-
-      {/* Right sidebar — Settings toggle / panel */}
-      <aside className="app__sidebar app__sidebar--right">
-        <button
-          className="app__settings-toggle"
-          onClick={() => setSettingsOpen(!settingsOpen)}
-          type="button"
-        >
-          {settingsOpen ? 'Close Settings' : 'Settings'}
-        </button>
-        {settingsOpen && <SettingsPanel />}
-      </aside>
-
-      {/* Guardrail modal */}
-      <GuardrailModal
-        guardrail={pendingGuardrail}
-        onApprove={handleGuardrailApprove}
-        onReject={handleGuardrailReject}
-      />
-    </div>
+    </AuthProvider>
   );
 };
 

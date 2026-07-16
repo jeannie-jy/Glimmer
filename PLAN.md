@@ -1,80 +1,80 @@
-# Lite Agent Harness Implementation Plan
+# Glimmer 实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **对智能体工作者的提示：** 必需子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 来按任务逐步实现该计划。步骤使用复选框（`- [ ]`）语法进行跟踪。
 
-**Goal:** Build a lightweight, model-agnostic coding agent harness with deterministic guardrails, feedback loop, web UI, and mock-driven testing.
+**目标：** 构建一个轻量级、模型无关的编码智能体框架，具有确定性护栏、反馈循环、Web UI 和模拟驱动测试。
 
-**Architecture:** State-machine-driven agent core with pluggable LLM adapters (Anthropic/OpenAI/Mock), three-layer sandbox guardrails, deterministic feedback analyzer, and FastAPI + WebSocket + React frontend (Open Design / Linear design system, see `DESIGN.md`). Distributed via Docker + PyInstaller.
+**架构：** 状态机驱动的智能体核心，带有可插拔的 LLM 适配器（Anthropic/OpenAI/Mock）、三层沙箱护栏、确定性反馈分析器，以及 FastAPI + WebSocket + React 前端（Open Design / Linear 设计系统，详见 `DESIGN.md`）。通过 Docker + PyInstaller 分发。
 
-**Tech Stack:** Python 3.12+, FastAPI, React + Vite + TypeScript, Open Design, pytest, keyring, PyInstaller, Docker
+**技术栈：** Python 3.12+, FastAPI, React + Vite + TypeScript, Open Design, pytest, keyring, PyInstaller, Docker
 
-## Global Constraints
+## 全局约束
 
-- Mock LLM required for all unit tests — zero network dependency in `tests/unit/`
-- `subprocess.run(shell=False)` for all shell execution
-- API keys never hardcoded, never in logs, never in git history
-- Credential status responses show masked keys only (`sk-...ab12` format)
-- Max 3 self-correction retries before forced termination
-- Max 50 planning iterations, 30s tool timeout, 60s LLM timeout
-- Config priority: project `.harness/config.yaml` > global `~/.harness/config.yaml` > defaults
-- Python 3.12+ only (no back-compat needed)
-- Frontend built as static files served by FastAPI
+- 所有单元测试必须使用 Mock LLM —— `tests/unit/` 中零网络依赖
+- 所有 shell 执行使用 `subprocess.run(shell=False)`
+- API 密钥绝不硬编码，绝不记录在日志中，绝不进入 git 历史
+- 凭据状态响应仅显示脱敏密钥（`sk-...ab12` 格式）
+- 强制终止前最多 3 次自我修正重试
+- 最多 50 次规划迭代，30 秒工具超时，60 秒 LLM 超时
+- 配置优先级：项目 `.harness/config.yaml` > 全局 `~/.harness/config.yaml` > 默认值
+- 仅支持 Python 3.12+（无需向后兼容）
+- 前端构建为静态文件，由 FastAPI 提供服务
 
 ---
 
-## File Structure
+## 文件结构
 
 ```
-lite-agent-harness/
-├── harness/                      # Harness kernel
+glimmer/
+├── harness/                      # 框架内核
 │   ├── __init__.py
-│   ├── models.py                 # Shared data models
-│   ├── state_machine.py          # State enum + transition table
-│   ├── loop.py                   # Main agent loop
+│   ├── models.py                 # 共享数据模型
+│   ├── state_machine.py          # 状态枚举 + 转换表
+│   ├── loop.py                   # 主智能体循环
 │   ├── llm/
 │   │   ├── __init__.py
-│   │   ├── adapter.py            # Abstract base
-│   │   ├── anthropic.py          # Anthropic provider
-│   │   ├── openai.py             # OpenAI provider
-│   │   └── mock.py               # Mock provider for testing
+│   │   ├── adapter.py            # 抽象基类
+│   │   ├── anthropic.py          # Anthropic 提供者
+│   │   ├── openai.py             # OpenAI 提供者
+│   │   └── mock.py               # 用于测试的 Mock 提供者
 │   ├── tools/
 │   │   ├── __init__.py
-│   │   ├── registry.py           # Tool registration/dispatch
+│   │   ├── registry.py           # 工具注册/调度
 │   │   ├── file_ops.py           # read_file, write_file
-│   │   ├── shell.py              # Sandboxed shell execution
-│   │   └── code_search.py        # Code search via ripgrep
+│   │   ├── shell.py              # 沙箱化 shell 执行
+│   │   └── code_search.py        # 通过 ripgrep 搜索代码
 │   ├── guardrails/
 │   │   ├── __init__.py
-│   │   ├── engine.py             # Three-layer orchestrator
-│   │   ├── path_sandbox.py       # Layer 1: filesystem boundaries
-│   │   ├── whitelist.py          # Layer 2: command whitelist
-│   │   └── patterns.py           # Layer 3: regex blacklist
+│   │   ├── engine.py             # 三层编排器
+│   │   ├── path_sandbox.py       # 第 1 层：文件系统边界
+│   │   ├── whitelist.py          # 第 2 层：命令白名单
+│   │   └── patterns.py           # 第 3 层：正则黑名单
 │   ├── feedback/
 │   │   ├── __init__.py
-│   │   ├── analyzer.py           # Main analyzer + strategy dispatch
-│   │   ├── pytest_parser.py      # pytest JSON -> structured failures
-│   │   └── retry_policy.py       # Retry count + limit policy
+│   │   ├── analyzer.py           # 主分析器 + 策略调度
+│   │   ├── pytest_parser.py      # pytest JSON -> 结构化失败信息
+│   │   └── retry_policy.py       # 重试次数 + 限制策略
 │   ├── memory/
 │   │   ├── __init__.py
-│   │   └── manager.py            # Three-layer memory storage/retrieval
+│   │   └── manager.py            # 三层内存存储/检索
 │   ├── config/
 │   │   ├── __init__.py
-│   │   └── manager.py            # YAML load/merge/validate
+│   │   └── manager.py            # YAML 加载/合并/验证
 │   └── credentials/
 │       ├── __init__.py
-│       └── manager.py            # keyring + AES fallback
+│       └── manager.py            # keyring + AES 回退
 │
-├── server/                       # Web layer
+├── server/                       # 网络层
 │   ├── __init__.py
-│   ├── main.py                   # FastAPI entry point
-│   ├── ws_handler.py             # WebSocket handler
+│   ├── main.py                   # FastAPI 入口点
+│   ├── ws_handler.py             # WebSocket 处理器
 │   └── api/
 │       ├── __init__.py
-│       ├── config_routes.py      # REST: configuration
-│       ├── credential_routes.py  # REST: credentials
-│       └── session_routes.py     # REST: session history
+│       ├── config_routes.py      # REST：配置
+│       ├── credential_routes.py  # REST：凭据
+│       └── session_routes.py     # REST：会话历史
 │
-├── web/                          # Frontend (React + Open Design / Linear)
+├── web/                          # 前端（React + Open Design / Linear）
 │   ├── src/
 │   │   ├── App.tsx
 │   │   ├── main.tsx
@@ -100,7 +100,7 @@ lite-agent-harness/
 │
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py               # Shared fixtures
+│   ├── conftest.py               # 共享 fixtures
 │   ├── unit/
 │   │   ├── test_state_machine.py
 │   │   ├── test_guardrail_sandbox.py
@@ -119,7 +119,7 @@ lite-agent-harness/
 │       ├── demo_feedback_loop.py
 │       └── demo_sandbox.py
 │
-├── .harness/config.yaml          # Project-level default config
+├── .harness/config.yaml          # 项目级默认配置
 ├── requirements.txt
 ├── Dockerfile
 ├── pyinstaller.spec
@@ -129,41 +129,41 @@ lite-agent-harness/
 
 ---
 
-### Task 1: Project scaffold
+### 任务 1：项目脚手架
 
-**Files:**
-- Create: `requirements.txt`, `Makefile`, `.harness/config.yaml`
-- Modify: `.gitignore`
+**文件：**
+- 创建：`requirements.txt`, `Makefile`, `.harness/config.yaml`
+- 修改：`.gitignore`
 
-**Interfaces:**
-- Produces: directory structure, dependency list, build targets used by all subsequent tasks
+**接口：**
+- 产出：目录结构、依赖列表、所有后续任务使用的构建目标
 
-- [ ] **Step 1: Create requirements.txt**
+- [ ] **步骤 1：创建 requirements.txt**
 
 ```txt
-# Core
+# 核心
 pydantic>=2.0
 pyyaml>=6.0
 
-# LLM providers
+# LLM 提供者
 anthropic>=0.40.0
 openai>=1.60.0
 
-# Web server
+# 网络服务器
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 
-# Credentials
+# 凭据
 keyring>=25.0
 cryptography>=43.0
 
-# Testing
+# 测试
 pytest>=8.0
 pytest-asyncio>=0.24.0
-httpx>=0.28.0  # for FastAPI TestClient
+httpx>=0.28.0  # 用于 FastAPI TestClient
 ```
 
-- [ ] **Step 2: Create Makefile**
+- [ ] **步骤 2：创建 Makefile**
 
 ```makefile
 .PHONY: test test-unit test-integration run build-docker build-binary clean
@@ -183,7 +183,7 @@ build-web:
 	cd web && npm install && npm run build
 
 build-docker:
-	docker build -t lite-agent-harness .
+	docker build -t glimmer .
 
 build-binary:
 	pyinstaller pyinstaller.spec
@@ -193,7 +193,7 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 ```
 
-- [ ] **Step 3: Create .harness/config.yaml**
+- [ ] **步骤 3：创建 .harness/config.yaml**
 
 ```yaml
 model:
@@ -215,9 +215,9 @@ memory:
   learnings_limit: 20
 ```
 
-- [ ] **Step 4: Update .gitignore**
+- [ ] **步骤 4：更新 .gitignore**
 
-Append to `.gitignore`:
+追加到 `.gitignore`：
 ```
 .harness/memory/
 .harness/credentials/
@@ -233,49 +233,49 @@ web/node_modules/
 *.spec
 ```
 
-- [ ] **Step 5: Install dependencies and verify**
+- [ ] **步骤 5：安装依赖并验证**
 
-Run: `pip install -r requirements.txt`
-Expected: all packages install without error
+运行：`pip install -r requirements.txt`
+预期结果：所有包安装成功，无错误
 
-Run: `python -c "import pydantic; import yaml; import fastapi; print('OK')"`
-Expected: `OK`
+运行：`python -c "import pydantic; import yaml; import fastapi; print('OK')"`
+预期结果：`OK`
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add requirements.txt Makefile .harness/config.yaml .gitignore
-git commit -m "chore: project scaffold with dependencies, Makefile, default config
+git commit -m "chore: 项目脚手架，包含依赖、Makefile、默认配置
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 2: Core data models
+### 任务 2：核心数据模型
 
-**Files:**
-- Create: `harness/__init__.py`, `harness/models.py`
-- Create: `tests/__init__.py`, `tests/conftest.py`
+**文件：**
+- 创建：`harness/__init__.py`, `harness/models.py`
+- 创建：`tests/__init__.py`, `tests/conftest.py`
 
-**Interfaces:**
-- Produces: `State(enum)`, `Message`, `ToolCall`, `ToolResult`, `ToolDef`, `Feedback`, `Verdict(enum)`, `GuardResult`, `GuardAction(enum)`, `LLMResponse`, `TokenUsage`, `Session`, `ConfigData` — all Pydantic models used by every subsequent task
+**接口：**
+- 产出：`State(enum)`, `Message`, `ToolCall`, `ToolResult`, `ToolDef`, `Feedback`, `Verdict(enum)`, `GuardResult`, `GuardAction(enum)`, `LLMResponse`, `TokenUsage`, `Session`, `ConfigData` —— 所有后续任务使用的 Pydantic 模型
 
-- [ ] **Step 1: Write tests for models**
+- [ ] **步骤 1：编写模型测试**
 
-Create `tests/unit/test_models.py` (create the models file task):
-Actually — models are pure data, no behavior to test. Validation is tested indirectly through dependent tests. Skip dedicated model tests.
+创建 `tests/unit/test_models.py`（这是创建模型文件的任务）：
+实际上 —— 模型是纯数据，没有可测试的行为。验证通过依赖测试间接完成。跳过专门的模型测试。
 
-- [ ] **Step 2: Create harness/__init__.py**
+- [ ] **步骤 2：创建 harness/__init__.py**
 
 ```python
-"""Lite Agent Harness - A lightweight, model-agnostic coding agent harness."""
+"""Glimmer - 一个轻量级、模型无关的编码智能体框架。"""
 ```
 
-- [ ] **Step 3: Create harness/models.py**
+- [ ] **步骤 3：创建 harness/models.py**
 
 ```python
-"""Shared data models for the harness."""
+"""框架的共享数据模型。"""
 
 from enum import Enum
 from datetime import datetime
@@ -284,7 +284,7 @@ from pydantic import BaseModel, Field
 
 
 class State(str, Enum):
-    """Agent state machine states."""
+    """智能体状态机状态。"""
     IDLE = "idle"
     PLANNING = "planning"
     EXECUTING = "executing"
@@ -296,7 +296,7 @@ class State(str, Enum):
 
 
 class Verdict(str, Enum):
-    """Feedback analysis verdict."""
+    """反馈分析判定结果。"""
     PASS = "pass"
     FAIL = "fail"
     WARNING = "warning"
@@ -304,35 +304,35 @@ class Verdict(str, Enum):
 
 
 class GuardAction(str, Enum):
-    """Guardrail check result action."""
+    """护栏检查结果动作。"""
     ALLOW = "allow"
     BLOCK = "block"
     ASK_HUMAN = "ask_human"
 
 
 class TokenUsage(BaseModel):
-    """LLM token usage counters."""
+    """LLM 令牌使用计数器。"""
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
 
 
 class ToolDef(BaseModel):
-    """Tool definition for LLM function calling."""
+    """LLM 函数调用的工具定义。"""
     name: str
     description: str
-    parameters: dict  # JSON Schema for the tool's parameters
+    parameters: dict  # 工具参数的 JSON Schema
 
 
 class ToolCall(BaseModel):
-    """A single tool invocation request."""
+    """单个工具调用请求。"""
     id: str
     name: str
     arguments: dict = Field(default_factory=dict)
 
 
 class ToolResult(BaseModel):
-    """Result of executing a tool."""
+    """执行工具的结果。"""
     tool_name: str
     exit_code: int = 0
     stdout: str = ""
@@ -342,7 +342,7 @@ class ToolResult(BaseModel):
 
 
 class Failure(BaseModel):
-    """A single test/check failure."""
+    """单个测试/检查失败。"""
     file: str
     line: int | None = None
     function: str | None = None
@@ -350,7 +350,7 @@ class Failure(BaseModel):
 
 
 class Feedback(BaseModel):
-    """Structured feedback from analyzing tool results."""
+    """分析工具结果得到的结构化反馈。"""
     verdict: Verdict
     failures: list[Failure] = Field(default_factory=list)
     summary: str = ""
@@ -359,14 +359,14 @@ class Feedback(BaseModel):
 
 
 class GuardResult(BaseModel):
-    """Result of a guardrail check."""
+    """护栏检查结果。"""
     action: GuardAction
-    layer: int  # 1, 2, or 3
+    layer: int  # 1、2 或 3
     reason: str = ""
 
 
 class LLMResponse(BaseModel):
-    """Unified LLM response across providers."""
+    """统一的不同提供者 LLM 响应。"""
     content: str = ""
     tool_calls: list[ToolCall] = Field(default_factory=list)
     stop_reason: str = ""  # "complete", "tool_use", "max_tokens", "error"
@@ -374,7 +374,7 @@ class LLMResponse(BaseModel):
 
 
 class Message(BaseModel):
-    """A single message in the conversation."""
+    """对话中的单条消息。"""
     role: str  # "system", "user", "assistant", "tool"
     content: str = ""
     tool_call_id: str | None = None
@@ -382,7 +382,7 @@ class Message(BaseModel):
 
 
 class Session(BaseModel):
-    """A complete agent task session."""
+    """完整的智能体任务会话。"""
     id: str
     task: str
     state: State = State.IDLE
@@ -395,7 +395,7 @@ class Session(BaseModel):
 
 
 class ConfigData(BaseModel):
-    """Harness configuration."""
+    """框架配置。"""
     model_provider: str = "anthropic"
     model_id: str = "claude-sonnet-5"
     max_tokens: int = 4096
@@ -410,10 +410,10 @@ class ConfigData(BaseModel):
     learnings_limit: int = 20
 ```
 
-- [ ] **Step 4: Create tests/conftest.py**
+- [ ] **步骤 4：创建 tests/conftest.py**
 
 ```python
-"""Shared test fixtures."""
+"""共享测试 fixtures。"""
 import pytest
 from harness.models import ConfigData
 
@@ -455,38 +455,38 @@ def sample_tool_result_fail() -> dict:
     }
 ```
 
-- [ ] **Step 5: Verify models import**
+- [ ] **步骤 5：验证模型导入**
 
-Run: `python -c "from harness.models import State, Message, ToolResult, Feedback; print('OK')"`
-Expected: `OK`
+运行：`python -c "from harness.models import State, Message, ToolResult, Feedback; print('OK')"`
+预期结果：`OK`
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add harness/ tests/
-git commit -m "feat: add core data models (State, Message, ToolResult, Feedback, etc.)
+git commit -m "feat: 添加核心数据模型（State, Message, ToolResult, Feedback 等）
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 3: LLM abstraction layer — interface + Mock adapter
+### 任务 3：LLM 抽象层 —— 接口 + Mock 适配器
 
-**Files:**
-- Create: `harness/llm/__init__.py`, `harness/llm/adapter.py`, `harness/llm/mock.py`
-- Create: `tests/unit/test_llm_mock.py`
+**文件：**
+- 创建：`harness/llm/__init__.py`, `harness/llm/adapter.py`, `harness/llm/mock.py`
+- 创建：`tests/unit/test_llm_mock.py`
 
-**Interfaces:**
-- Produces: `LLMAdapter(ABC)` with `async chat(messages, tools, stream) -> LLMResponse`
-- Produces: `MockLLMAdapter(LLMAdapter)` with pre-programmed response sequences
+**接口：**
+- 产出：`LLMAdapter(ABC)`，带有 `async chat(messages, tools, stream) -> LLMResponse`
+- 产出：`MockLLMAdapter(LLMAdapter)`，带有预编程的响应序列
 
-- [ ] **Step 1: Write failing test for MockLLM**
+- [ ] **步骤 1：为 MockLLM 编写失败的测试**
 
-Create `tests/unit/test_llm_mock.py`:
+创建 `tests/unit/test_llm_mock.py`：
 
 ```python
-"""Tests for MockLLM adapter."""
+"""MockLLM 适配器的测试。"""
 import pytest
 from harness.llm.adapter import LLMAdapter
 from harness.llm.mock import MockLLMAdapter
@@ -495,7 +495,7 @@ from harness.models import Message, ToolDef, LLMResponse
 
 class TestMockLLMAdapter:
     def test_returns_preprogrammed_responses_in_sequence(self):
-        """MockLLM should return responses in the order they were programmed."""
+        """MockLLM 应按编程顺序返回响应。"""
         responses = [
             LLMResponse(content="I'll look at the code first.", stop_reason="complete"),
             LLMResponse(content="", stop_reason="tool_use", tool_calls=[
@@ -518,7 +518,7 @@ class TestMockLLMAdapter:
         assert r3.content == "The bug is fixed."
 
     def test_raises_when_no_more_responses(self):
-        """MockLLM should raise when called more times than programmed responses."""
+        """MockLLM 在被调用次数超过编程响应数时应抛出异常。"""
         adapter = MockLLMAdapter([LLMResponse(content="Done.", stop_reason="complete")])
 
         await adapter.chat([Message(role="user", content="Task 1")], [])
@@ -527,7 +527,7 @@ class TestMockLLMAdapter:
             await adapter.chat([Message(role="user", content="Task 2")], [])
 
     def test_records_call_history(self):
-        """MockLLM should record all calls for inspection in tests."""
+        """MockLLM 应记录所有调用以供测试中检查。"""
         adapter = MockLLMAdapter([
             LLMResponse(content="First"),
             LLMResponse(content="Second"),
@@ -541,7 +541,7 @@ class TestMockLLMAdapter:
         assert adapter.call_history[1]["messages"][0].content == "Q2"
 
     def test_stream_yields_content_in_chunks(self):
-        """MockLLM streaming should yield content in simulated chunks."""
+        """MockLLM 流式传输应以模拟块的形式产出内容。"""
         adapter = MockLLMAdapter([
             LLMResponse(content="Hello world"),
         ])
@@ -556,35 +556,35 @@ class TestMockLLMAdapter:
         assert "".join(chunks) == "Hello world"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试以验证其失败**
 
-Run: `pytest tests/unit/test_llm_mock.py -v`
-Expected: FAIL — module not found
+运行：`pytest tests/unit/test_llm_mock.py -v`
+预期结果：FAIL —— 找不到模块
 
-- [ ] **Step 3: Create harness/llm/__init__.py**
+- [ ] **步骤 3：创建 harness/llm/__init__.py**
 
 ```python
-"""LLM abstraction layer."""
+"""LLM 抽象层。"""
 from harness.llm.adapter import LLMAdapter
 from harness.llm.mock import MockLLMAdapter
 
 __all__ = ["LLMAdapter", "MockLLMAdapter"]
 ```
 
-- [ ] **Step 4: Create harness/llm/adapter.py**
+- [ ] **步骤 4：创建 harness/llm/adapter.py**
 
 ```python
-"""Abstract base class for LLM adapters."""
+"""LLM 适配器的抽象基类。"""
 from abc import ABC, abstractmethod
 from typing import AsyncIterator
 from harness.models import Message, ToolDef, LLMResponse
 
 
 class LLMAdapter(ABC):
-    """Unified interface for LLM providers.
+    """LLM 提供者的统一接口。
 
-    Each provider (Anthropic, OpenAI, Mock) implements this interface.
-    The harness core only depends on this ABC, never on concrete adapters.
+    每个提供者（Anthropic、OpenAI、Mock）实现此接口。
+    框架核心仅依赖于此 ABC，从不依赖具体适配器。
     """
 
     @abstractmethod
@@ -594,15 +594,15 @@ class LLMAdapter(ABC):
         tools: list[ToolDef],
         stream: bool = True,
     ) -> LLMResponse:
-        """Send a conversation to the LLM and get a response.
+        """向 LLM 发送对话并获取响应。
 
-        Args:
-            messages: Conversation history.
-            tools: Available tool definitions for function calling.
-            stream: If True, stream tokens; if False, return complete response.
+        参数：
+            messages: 对话历史。
+            tools: 用于函数调用的可用工具定义。
+            stream: 如果为 True，则流式传输令牌；如果为 False，则返回完整响应。
 
-        Returns:
-            Unified LLMResponse with content and/or tool_calls.
+        返回：
+            包含内容和/或 tool_calls 的统一 LLMResponse。
         """
         ...
 
@@ -612,32 +612,32 @@ class LLMAdapter(ABC):
         messages: list[Message],
         tools: list[ToolDef],
     ) -> AsyncIterator[str]:
-        """Stream text tokens from the LLM.
+        """从 LLM 流式传输文本令牌。
 
-        Args:
-            messages: Conversation history.
-            tools: Available tool definitions.
+        参数：
+            messages: 对话历史。
+            tools: 可用工具定义。
 
-        Yields:
-            Text chunks (individual tokens or small groups).
+        产出：
+            文本块（单个令牌或小组）。
         """
         ...
 ```
 
-- [ ] **Step 5: Create harness/llm/mock.py**
+- [ ] **步骤 5：创建 harness/llm/mock.py**
 
 ```python
-"""Mock LLM adapter for deterministic testing."""
+"""用于确定性测试的 Mock LLM 适配器。"""
 from typing import AsyncIterator
 from harness.llm.adapter import LLMAdapter
 from harness.models import Message, ToolDef, LLMResponse
 
 
 class MockLLMAdapter(LLMAdapter):
-    """LLM adapter that returns pre-programmed responses.
+    """返回预编程响应的 LLM 适配器。
 
-    Used in unit tests to deterministically verify harness behavior
-    without real LLM calls. Responses are consumed in FIFO order.
+    在单元测试中用于确定性验证框架行为，无需真实 LLM 调用。
+    响应按 FIFO 顺序消费。
     """
 
     def __init__(self, responses: list[LLMResponse]):
@@ -654,8 +654,8 @@ class MockLLMAdapter(LLMAdapter):
         self.call_history.append({"messages": messages, "tools": tools})
         if self._index >= len(self._responses):
             raise IndexError(
-                f"No more mock responses (called {self._index + 1} times, "
-                f"only {len(self._responses)} responses programmed)"
+                f"没有更多的模拟响应（已调用 {self._index + 1} 次，"
+                f"仅编程了 {len(self._responses)} 个响应）"
             )
         response = self._responses[self._index]
         self._index += 1
@@ -667,42 +667,42 @@ class MockLLMAdapter(LLMAdapter):
         tools: list[ToolDef],
     ) -> AsyncIterator[str]:
         response = await self.chat(messages, tools)
-        # Simulate streaming by yielding content in word-based chunks
+        # 通过以单词块的形式产出内容来模拟流式传输
         words = response.content.split()
         for i, word in enumerate(words):
             chunk = word + (" " if i < len(words) - 1 else "")
             yield chunk
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [ ] **步骤 6：运行测试以验证其通过**
 
-Run: `pytest tests/unit/test_llm_mock.py -v`
-Expected: 4 PASS
+运行：`pytest tests/unit/test_llm_mock.py -v`
+预期结果：4 个 PASS
 
-- [ ] **Step 7: Commit**
+- [ ] **步骤 7：提交**
 
 ```bash
 git add harness/llm/ tests/unit/test_llm_mock.py
-git commit -m "feat: add LLM abstraction layer with Mock adapter
+git commit -m "feat: 添加带有 Mock 适配器的 LLM 抽象层
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 4: Anthropic and OpenAI LLM adapters
+### 任务 4：Anthropic 和 OpenAI LLM 适配器
 
-**Files:**
-- Create: `harness/llm/anthropic.py`, `harness/llm/openai.py`
+**文件：**
+- 创建：`harness/llm/anthropic.py`, `harness/llm/openai.py`
 
-**Interfaces:**
-- Consumes: `LLMAdapter` ABC from Task 3
-- Produces: `AnthropicAdapter(LLMAdapter)`, `OpenAIAdapter(LLMAdapter)` — callable via `chat()` returning `LLMResponse`
+**接口：**
+- 消费：来自任务 3 的 `LLMAdapter` ABC
+- 产出：`AnthropicAdapter(LLMAdapter)`, `OpenAIAdapter(LLMAdapter)` —— 可通过 `chat()` 调用，返回 `LLMResponse`
 
-- [ ] **Step 1: Create harness/llm/anthropic.py**
+- [ ] **步骤 1：创建 harness/llm/anthropic.py**
 
 ```python
-"""Anthropic Messages API adapter."""
+"""Anthropic Messages API 适配器。"""
 from typing import AsyncIterator
 import anthropic
 from harness.llm.adapter import LLMAdapter
@@ -710,7 +710,7 @@ from harness.models import Message, ToolDef, LLMResponse, TokenUsage, ToolCall
 
 
 class AnthropicAdapter(LLMAdapter):
-    """Adapter for Anthropic's Messages API."""
+    """Anthropic Messages API 的适配器。"""
 
     def __init__(self, api_key: str, model: str = "claude-sonnet-5-20251001"):
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
@@ -721,7 +721,7 @@ class AnthropicAdapter(LLMAdapter):
         converted = []
         for m in messages:
             if m.role == "system":
-                continue  # handled separately
+                continue  # 单独处理
             if m.role == "tool":
                 converted.append({
                     "role": "user",
@@ -803,10 +803,10 @@ class AnthropicAdapter(LLMAdapter):
                 yield text
 ```
 
-- [ ] **Step 2: Create harness/llm/openai.py**
+- [ ] **步骤 2：创建 harness/llm/openai.py**
 
 ```python
-"""OpenAI Chat Completions API adapter."""
+"""OpenAI Chat Completions API 适配器。"""
 from typing import AsyncIterator
 from openai import AsyncOpenAI
 from harness.llm.adapter import LLMAdapter
@@ -814,7 +814,7 @@ from harness.models import Message, ToolDef, LLMResponse, TokenUsage, ToolCall
 
 
 class OpenAIAdapter(LLMAdapter):
-    """Adapter for OpenAI's Chat Completions API."""
+    """OpenAI Chat Completions API 的适配器。"""
 
     def __init__(self, api_key: str, model: str = "gpt-4o"):
         self._client = AsyncOpenAI(api_key=api_key)
@@ -903,41 +903,41 @@ class OpenAIAdapter(LLMAdapter):
                 yield chunk.choices[0].delta.content
 ```
 
-- [ ] **Step 3: Verify imports**
+- [ ] **步骤 3：验证导入**
 
-Run: `python -c "from harness.llm.anthropic import AnthropicAdapter; from harness.llm.openai import OpenAIAdapter; print('OK')"`
-Expected: `OK`
+运行：`python -c "from harness.llm.anthropic import AnthropicAdapter; from harness.llm.openai import OpenAIAdapter; print('OK')"`
+预期结果：`OK`
 
-Note: These adapters are tested indirectly via integration tests that use mock LLM. Direct Anthropic/OpenAI adapter tests would require real API keys (excluded by global constraint).
+注意：这些适配器通过使用 mock LLM 的集成测试间接测试。直接的 Anthropic/OpenAI 适配器测试需要真实的 API 密钥（被全局约束排除）。
 
-- [ ] **Step 4: Commit**
+- [ ] **步骤 4：提交**
 
 ```bash
 git add harness/llm/anthropic.py harness/llm/openai.py
-git commit -m "feat: add Anthropic and OpenAI LLM adapters
+git commit -m "feat: 添加 Anthropic 和 OpenAI LLM 适配器
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 5: Tool registry and built-in tools
+### 任务 5：工具注册表和内置工具
 
-**Files:**
-- Create: `harness/tools/__init__.py`, `harness/tools/registry.py`, `harness/tools/file_ops.py`, `harness/tools/shell.py`, `harness/tools/code_search.py`
-- Create: `tests/unit/test_tool_registry.py`
+**文件：**
+- 创建：`harness/tools/__init__.py`, `harness/tools/registry.py`, `harness/tools/file_ops.py`, `harness/tools/shell.py`, `harness/tools/code_search.py`
+- 创建：`tests/unit/test_tool_registry.py`
 
-**Interfaces:**
-- Consumes: `ToolDef`, `ToolCall`, `ToolResult` from Task 2
-- Produces: `Tool` (ABC), `ToolRegistry` with `register()`, `dispatch()`, `list_defs()`
-- Produces: `ReadFileTool`, `WriteFileTool`, `ExecuteShellTool`, `RunTestsTool`, `SearchCodeTool`
+**接口：**
+- 消费：来自任务 2 的 `ToolDef`, `ToolCall`, `ToolResult`
+- 产出：`Tool` (ABC), `ToolRegistry`，包含 `register()`, `dispatch()`, `list_defs()`
+- 产出：`ReadFileTool`, `WriteFileTool`, `ExecuteShellTool`, `RunTestsTool`, `SearchCodeTool`
 
-- [ ] **Step 1: Write failing tests for ToolRegistry**
+- [ ] **步骤 1：为 ToolRegistry 编写失败的测试**
 
-Create `tests/unit/test_tool_registry.py`:
+创建 `tests/unit/test_tool_registry.py`：
 
 ```python
-"""Tests for tool registry."""
+"""工具注册表的测试。"""
 import pytest
 from harness.tools.registry import ToolRegistry, Tool
 from harness.models import ToolCall, ToolResult
@@ -950,7 +950,7 @@ class _EchoTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Echo back input"
+        return "回显输入"
 
     @property
     def parameters(self) -> dict:
@@ -992,15 +992,15 @@ class TestToolRegistry:
             registry.register(_EchoTool())
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试以验证其失败**
 
-Run: `pytest tests/unit/test_tool_registry.py -v`
-Expected: FAIL
+运行：`pytest tests/unit/test_tool_registry.py -v`
+预期结果：FAIL
 
-- [ ] **Step 3: Create harness/tools/__init__.py**
+- [ ] **步骤 3：创建 harness/tools/__init__.py**
 
 ```python
-"""Tool dispatch layer."""
+"""工具调度层。"""
 from harness.tools.registry import Tool, ToolRegistry
 from harness.tools.file_ops import ReadFileTool, WriteFileTool
 from harness.tools.shell import ExecuteShellTool, RunTestsTool
@@ -1014,16 +1014,16 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 4: Create harness/tools/registry.py**
+- [ ] **步骤 4：创建 harness/tools/registry.py**
 
 ```python
-"""Tool registration and dispatch."""
+"""工具注册和调度。"""
 from abc import ABC, abstractmethod
 from harness.models import ToolDef, ToolCall, ToolResult
 
 
 class Tool(ABC):
-    """Interface for a tool the agent can invoke."""
+    """智能体可以调用的工具接口。"""
 
     @property
     @abstractmethod
@@ -1045,14 +1045,14 @@ class Tool(ABC):
 
 
 class ToolRegistry:
-    """Registry of available tools with dispatch."""
+    """可用工具的注册表，支持调度。"""
 
     def __init__(self):
         self._tools: dict[str, Tool] = {}
 
     def register(self, tool: Tool) -> None:
         if tool.name in self._tools:
-            raise ValueError(f"Tool '{tool.name}' already registered")
+            raise ValueError(f"工具 '{tool.name}' 已注册")
         self._tools[tool.name] = tool
 
     def list_defs(self) -> list[ToolDef]:
@@ -1061,16 +1061,16 @@ class ToolRegistry:
     async def dispatch(self, call: ToolCall) -> ToolResult:
         tool = self._tools.get(call.name)
         if tool is None:
-            raise ValueError(f"Unknown tool: {call.name}")
+            raise ValueError(f"未知工具：{call.name}")
         return await tool.execute(call.arguments)
 ```
 
-- [ ] **Step 5: Create built-in tools**
+- [ ] **步骤 5：创建内置工具**
 
-Create `harness/tools/file_ops.py`:
+创建 `harness/tools/file_ops.py`：
 
 ```python
-"""File operation tools."""
+"""文件操作工具。"""
 from pathlib import Path
 from harness.tools.registry import Tool
 from harness.models import ToolResult
@@ -1083,16 +1083,16 @@ class ReadFileTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Read the contents of a file."
+        return "读取文件内容。"
 
     @property
     def parameters(self) -> dict:
         return {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Path to the file to read"},
-                "offset": {"type": "integer", "description": "Line number to start reading from"},
-                "limit": {"type": "integer", "description": "Maximum number of lines to read"},
+                "path": {"type": "string", "description": "要读取的文件路径"},
+                "offset": {"type": "integer", "description": "开始读取的行号"},
+                "limit": {"type": "integer", "description": "最大读取行数"},
             },
             "required": ["path"],
         }
@@ -1133,15 +1133,15 @@ class WriteFileTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Create or overwrite a file with new content."
+        return "创建或覆盖文件内容。"
 
     @property
     def parameters(self) -> dict:
         return {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Path to the file to write"},
-                "content": {"type": "string", "description": "Content to write to the file"},
+                "path": {"type": "string", "description": "要写入的文件路径"},
+                "content": {"type": "string", "description": "要写入文件的内容"},
             },
             "required": ["path", "content"],
         }
@@ -1157,7 +1157,7 @@ class WriteFileTool(Tool):
             return ToolResult(
                 tool_name="write_file",
                 exit_code=0,
-                stdout=f"Wrote {len(content)} bytes to {path}",
+                stdout=f"已将 {len(content)} 字节写入 {path}",
                 duration_ms=int((time.time() - start) * 1000),
             )
         except Exception as e:
@@ -1169,10 +1169,10 @@ class WriteFileTool(Tool):
             )
 ```
 
-Create `harness/tools/shell.py`:
+创建 `harness/tools/shell.py`：
 
 ```python
-"""Shell execution tool (sandboxed)."""
+"""Shell 执行工具（沙箱化）。"""
 import subprocess
 import time
 from pathlib import Path
@@ -1181,7 +1181,7 @@ from harness.models import ToolResult
 
 
 class ExecuteShellTool(Tool):
-    """Execute a shell command in a sandboxed subprocess."""
+    """在沙箱子进程中执行 shell 命令。"""
 
     def __init__(self, cwd: Path | None = None, timeout: int = 30):
         self._cwd = cwd
@@ -1193,15 +1193,15 @@ class ExecuteShellTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Execute a shell command. Use for running tests, builds, git commands, etc."
+        return "执行 shell 命令。用于运行测试、构建、git 命令等。"
 
     @property
     def parameters(self) -> dict:
         return {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The shell command to execute"},
-                "cwd": {"type": "string", "description": "Working directory (defaults to project root)"},
+                "command": {"type": "string", "description": "要执行的 shell 命令"},
+                "cwd": {"type": "string", "description": "工作目录（默认为项目根目录）"},
             },
             "required": ["command"],
         }
@@ -1231,7 +1231,7 @@ class ExecuteShellTool(Tool):
             return ToolResult(
                 tool_name="execute_shell",
                 exit_code=-1,
-                stderr=f"Command timed out after {self._timeout}s",
+                stderr=f"命令在 {self._timeout}s 后超时",
                 duration_ms=self._timeout * 1000,
             )
         except Exception as e:
@@ -1244,7 +1244,7 @@ class ExecuteShellTool(Tool):
 
 
 class RunTestsTool(Tool):
-    """Run pytest and collect structured results."""
+    """运行 pytest 并收集结构化结果。"""
 
     def __init__(self, cwd: Path | None = None, timeout: int = 60):
         self._cwd = cwd
@@ -1256,14 +1256,14 @@ class RunTestsTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Run the test suite using pytest and return structured results."
+        return "使用 pytest 运行测试套件并返回结构化结果。"
 
     @property
     def parameters(self) -> dict:
         return {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Specific test path (default: tests/)"},
+                "path": {"type": "string", "description": "特定测试路径（默认：tests/）"},
             },
             "required": [],
         }
@@ -1275,7 +1275,7 @@ class RunTestsTool(Tool):
         test_path = arguments.get("path", "tests/")
         cwd = self._cwd or Path.cwd()
 
-        # Use pytest's JSON report for structured output
+        # 使用 pytest 的 JSON 报告以获取结构化输出
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             report_path = f.name
 
@@ -1328,7 +1328,7 @@ class RunTestsTool(Tool):
             return ToolResult(
                 tool_name="run_tests",
                 exit_code=-1,
-                stderr=f"Tests timed out after {self._timeout}s",
+                stderr=f"测试在 {self._timeout}s 后超时",
                 duration_ms=self._timeout * 1000,
             )
         except Exception as e:
@@ -1345,10 +1345,10 @@ class RunTestsTool(Tool):
                 pass
 ```
 
-Create `harness/tools/code_search.py`:
+创建 `harness/tools/code_search.py`：
 
 ```python
-"""Code search tool using ripgrep with Python fallback."""
+"""使用 ripgrep 的代码搜索工具，带有 Python 回退。"""
 import subprocess
 import time
 from pathlib import Path
@@ -1367,16 +1367,16 @@ class SearchCodeTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Search codebase for a pattern using ripgrep (falls back to Python grep)."
+        return "使用 ripgrep 搜索代码库中的模式（回退到 Python grep）。"
 
     @property
     def parameters(self) -> dict:
         return {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Regex pattern to search for"},
-                "path": {"type": "string", "description": "Directory to search in (default: project root)"},
-                "glob": {"type": "string", "description": "File glob filter (e.g., '*.py')"},
+                "pattern": {"type": "string", "description": "要搜索的正则模式"},
+                "path": {"type": "string", "description": "要搜索的目录（默认：项目根目录）"},
+                "glob": {"type": "string", "description": "文件 glob 过滤器（例如 '*.py'）"},
             },
             "required": ["pattern"],
         }
@@ -1388,7 +1388,7 @@ class SearchCodeTool(Tool):
         search_path = Path(arguments.get("path", str(self._cwd or Path.cwd())))
         glob_filter = arguments.get("glob")
 
-        # Try ripgrep first
+        # 先尝试 ripgrep
         try:
             cmd = ["rg", "--line-number", "--no-heading", pattern, str(search_path)]
             if glob_filter:
@@ -1403,12 +1403,12 @@ class SearchCodeTool(Tool):
             return ToolResult(
                 tool_name="search_code",
                 exit_code=proc.returncode if proc.returncode <= 1 else proc.returncode,
-                stdout=proc.stdout if proc.stdout else "No matches found.",
+                stdout=proc.stdout if proc.stdout else "未找到匹配项。",
                 stderr=proc.stderr,
                 duration_ms=int((time.time() - start) * 1000),
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            # ripgrep not available or timed out — fall back to Python
+            # ripgrep 不可用或超时 —— 回退到 Python
             results = []
             for file_path in search_path.rglob("*"):
                 if file_path.is_dir():
@@ -1421,7 +1421,7 @@ class SearchCodeTool(Tool):
                             results.append(f"{file_path}:{i}:{line.strip()}")
                 except Exception:
                     continue
-            output = "\n".join(results[:200]) if results else "No matches found."
+            output = "\n".join(results[:200]) if results else "未找到匹配项。"
             return ToolResult(
                 tool_name="search_code",
                 exit_code=0,
@@ -1430,38 +1430,38 @@ class SearchCodeTool(Tool):
             )
 ```
 
-- [ ] **Step 6: Run tool registry tests**
+- [ ] **步骤 6：运行工具注册表测试**
 
-Run: `pytest tests/unit/test_tool_registry.py -v`
-Expected: 3 PASS
+运行：`pytest tests/unit/test_tool_registry.py -v`
+预期结果：3 个 PASS
 
-- [ ] **Step 7: Commit**
+- [ ] **步骤 7：提交**
 
 ```bash
 git add harness/tools/ tests/unit/test_tool_registry.py
-git commit -m "feat: add tool registry and built-in tools
+git commit -m "feat: 添加工具注册表和内置工具
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 6: Guardrails — three-layer sandbox
+### 任务 6：护栏 —— 三层沙箱
 
-**Files:**
-- Create: `harness/guardrails/__init__.py`, `harness/guardrails/path_sandbox.py`, `harness/guardrails/whitelist.py`, `harness/guardrails/patterns.py`, `harness/guardrails/engine.py`
-- Create: `tests/unit/test_guardrail_sandbox.py`, `tests/unit/test_guardrail_patterns.py`
+**文件：**
+- 创建：`harness/guardrails/__init__.py`, `harness/guardrails/path_sandbox.py`, `harness/guardrails/whitelist.py`, `harness/guardrails/patterns.py`, `harness/guardrails/engine.py`
+- 创建：`tests/unit/test_guardrail_sandbox.py`, `tests/unit/test_guardrail_patterns.py`
 
-**Interfaces:**
-- Consumes: `ToolCall`, `GuardResult`, `GuardAction` from Task 2
-- Produces: `PathSandbox`, `CommandWhitelist`, `PatternBlacklist`, `GuardrailEngine` with `check(tool_call) -> GuardResult`
+**接口：**
+- 消费：来自任务 2 的 `ToolCall`, `GuardResult`, `GuardAction`
+- 产出：`PathSandbox`, `CommandWhitelist`, `PatternBlacklist`, `GuardrailEngine`，包含 `check(tool_call) -> GuardResult`
 
-- [ ] **Step 1: Write failing tests for path sandbox**
+- [ ] **步骤 1：为路径沙箱编写失败的测试**
 
-Create `tests/unit/test_guardrail_sandbox.py`:
+创建 `tests/unit/test_guardrail_sandbox.py`：
 
 ```python
-"""Tests for Layer 1 path sandbox."""
+"""第 1 层路径沙箱的测试。"""
 from pathlib import Path
 import pytest
 from harness.guardrails.path_sandbox import PathSandbox
@@ -1493,17 +1493,17 @@ class TestPathSandbox:
         assert result.action == GuardAction.BLOCK
 
     def test_blocks_symlink_escape(self, sandbox, tmp_path):
-        # Even if resolve() escapes root, block it
+        # 即使 resolve() 逃逸了根目录，也阻止它
         result = sandbox.validate(str(tmp_path / ".." / ".." / "etc" / "passwd"), "read")
         assert result.action == GuardAction.BLOCK
 ```
 
-- [ ] **Step 2: Write failing tests for pattern blacklist**
+- [ ] **步骤 2：为正则黑名单编写失败的测试**
 
-Create `tests/unit/test_guardrail_patterns.py`:
+创建 `tests/unit/test_guardrail_patterns.py`：
 
 ```python
-"""Tests for Layer 3 regex pattern blacklist."""
+"""第 3 层正则黑名单的测试。"""
 import pytest
 from harness.guardrails.patterns import PatternBlacklist
 from harness.models import GuardAction
@@ -1535,32 +1535,32 @@ class TestPatternBlacklist:
         assert result.action == GuardAction.ALLOW
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [ ] **步骤 3：运行测试以验证其失败**
 
-Run: `pytest tests/unit/test_guardrail_sandbox.py tests/unit/test_guardrail_patterns.py -v`
-Expected: FAIL
+运行：`pytest tests/unit/test_guardrail_sandbox.py tests/unit/test_guardrail_patterns.py -v`
+预期结果：FAIL
 
-- [ ] **Step 4: Implement path sandbox**
+- [ ] **步骤 4：实现路径沙箱**
 
-Create `harness/guardrails/__init__.py`:
+创建 `harness/guardrails/__init__.py`：
 
 ```python
-"""Guardrails — three-layer safety system."""
+"""护栏 —— 三层安全系统。"""
 from harness.guardrails.engine import GuardrailEngine
 
 __all__ = ["GuardrailEngine"]
 ```
 
-Create `harness/guardrails/path_sandbox.py`:
+创建 `harness/guardrails/path_sandbox.py`：
 
 ```python
-"""Layer 1: Filesystem path sandbox."""
+"""第 1 层：文件系统路径沙箱。"""
 from pathlib import Path
 from harness.models import GuardResult, GuardAction
 
 
 class PathSandbox:
-    """Restrict file read/write to allowed directories."""
+    """将文件读/写限制到允许的目录。"""
 
     def __init__(self, root: str):
         self._root = Path(root).resolve()
@@ -1578,40 +1578,40 @@ class PathSandbox:
         if mode == "write":
             allowed = any(target == d or str(target).startswith(str(d) + "/") or str(target).startswith(str(d) + "\\") for d in self._writable_dirs)
             if not allowed:
-                return GuardResult(action=GuardAction.BLOCK, layer=1, reason=f"Write outside sandbox: {target}")
+                return GuardResult(action=GuardAction.BLOCK, layer=1, reason=f"写入操作超出沙箱范围：{target}")
         elif mode == "read":
             allowed = any(target == d or str(target).startswith(str(d) + "/") or str(target).startswith(str(d) + "\\") for d in self._readable_dirs)
             if not allowed:
-                return GuardResult(action=GuardAction.BLOCK, layer=1, reason=f"Read outside sandbox: {target}")
+                return GuardResult(action=GuardAction.BLOCK, layer=1, reason=f"读取操作超出沙箱范围：{target}")
         return GuardResult(action=GuardAction.ALLOW, layer=1)
 ```
 
-Create `harness/guardrails/whitelist.py`:
+创建 `harness/guardrails/whitelist.py`：
 
 ```python
-"""Layer 2: Command whitelist."""
+"""第 2 层：命令白名单。"""
 from harness.models import GuardResult, GuardAction
 
 
 DEFAULT_WHITELIST = {
-    # File ops
+    # 文件操作
     "ls", "cat", "head", "tail", "find", "grep", "wc",
-    # Dev tools
+    # 开发工具
     "python", "python3", "pytest", "pip", "npm", "node", "cargo",
     "git", "docker", "make", "cmake", "npx",
-    # System
+    # 系统
     "echo", "mkdir", "cp", "mv", "touch", "chmod", "which", "rm", "rmdir",
 }
 
 
 class CommandWhitelist:
-    """Only allow commands from a configurable whitelist."""
+    """仅允许来自可配置白名单的命令。"""
 
     def __init__(self, extra: list[str] | None = None):
         self._whitelist = DEFAULT_WHITELIST | set(extra or [])
 
     def check(self, command: str) -> GuardResult:
-        # Extract first token (the executable name)
+        # 提取第一个令牌（可执行文件名）
         tokens = command.strip().split()
         if not tokens:
             return GuardResult(action=GuardAction.ALLOW, layer=2)
@@ -1621,39 +1621,38 @@ class CommandWhitelist:
         return GuardResult(
             action=GuardAction.ASK_HUMAN,
             layer=2,
-            reason=f"Command '{executable}' is not in the whitelist",
+            reason=f"命令 '{executable}' 不在白名单中",
         )
 ```
 
-Create `harness/guardrails/patterns.py`:
+创建 `harness/guardrails/patterns.py`：
 
 ```python
-"""Layer 3: Regex pattern blacklist for dangerous command arguments."""
+"""第 3 层：危险命令参数的正则黑名单。"""
 import re
 from harness.models import GuardResult, GuardAction
 
 
 DANGEROUS_PATTERNS: list[tuple[str, GuardAction, str]] = [
-    (r"rm\s+-rf\s+/", GuardAction.BLOCK, "Recursive delete of root directory"),
-    (r"rm\s+-rf\s+~", GuardAction.BLOCK, "Recursive delete of home directory"),
-    (r"DROP\s+(TABLE|DATABASE)", GuardAction.BLOCK, "Database destructive operation"),
-    (r"TRUNCATE\s+(TABLE|DATABASE)", GuardAction.BLOCK, "Database destructive operation"),
-    (r"git\s+push\s+--force.*origin.*main", GuardAction.ASK_HUMAN, "Force push to main branch"),
-    (r"git\s+push\s+--force.*origin.*master", GuardAction.ASK_HUMAN, "Force push to master branch"),
-    (r"curl.*\|.*(bash|sh|python)", GuardAction.ASK_HUMAN, "Pipe remote script to interpreter"),
-    (r"wget.*\|.*(bash|sh)", GuardAction.ASK_HUMAN, "Pipe remote script to interpreter"),
-    (r"chmod\s+777\s+/", GuardAction.ASK_HUMAN, "World-writable permissions on root path"),
-    (r"dd\s+if=", GuardAction.ASK_HUMAN, "Low-level disk operation"),
-    (r">\s*/dev/sd", GuardAction.BLOCK, "Direct disk write"),
+    (r"rm\s+-rf\s+/", GuardAction.BLOCK, "递归删除根目录"),
+    (r"rm\s+-rf\s+~", GuardAction.BLOCK, "递归删除家目录"),
+    (r"DROP\s+(TABLE|DATABASE)", GuardAction.BLOCK, "数据库破坏性操作"),
+    (r"TRUNCATE\s+(TABLE|DATABASE)", GuardAction.BLOCK, "数据库破坏性操作"),
+    (r"git\s+push\s+--force.*origin.*main", GuardAction.ASK_HUMAN, "强制推送到 main 分支"),
+    (r"git\s+push\s+--force.*origin.*master", GuardAction.ASK_HUMAN, "强制推送到 master 分支"),
+    (r"curl.*\|.*(bash|sh|python)", GuardAction.ASK_HUMAN, "通过管道将远程脚本传递给解释器"),
+    (r"wget.*\|.*(bash|sh)", GuardAction.ASK_HUMAN, "通过管道将远程脚本传递给解释器"),
+    (r"chmod\s+777\s+/", GuardAction.ASK_HUMAN, "根路径上的全局可写权限"),
+    (r"dd\s+if=", GuardAction.ASK_HUMAN, "低级磁盘操作"),
+    (r">\s*/dev/sd", GuardAction.BLOCK, "直接磁盘写入"),
 ]
 
 
 class PatternBlacklist:
-    """Regex-based dangerous command pattern detection.
+    """基于正则的危险命令模式检测。
 
-    Note: This layer is a best-effort defense. Encoding, base64 obfuscation,
-    and indirect execution can bypass regex matching. For production, pair
-    with seccomp/AppArmor sandboxing.
+    注意：此层是尽力而为的防御。编码、base64 混淆和间接执行
+    可以绕过正则匹配。生产环境中请结合 seccomp/AppArmor 沙箱使用。
     """
 
     def __init__(self, extra_patterns: list[tuple[str, GuardAction, str]] | None = None):
@@ -1668,10 +1667,10 @@ class PatternBlacklist:
         return GuardResult(action=GuardAction.ALLOW, layer=3)
 ```
 
-Create `harness/guardrails/engine.py`:
+创建 `harness/guardrails/engine.py`：
 
 ```python
-"""Guardrail engine — orchestrates three layers of defense."""
+"""护栏引擎 —— 编排三道防线。"""
 from harness.models import ToolCall, GuardResult, GuardAction
 from harness.guardrails.path_sandbox import PathSandbox
 from harness.guardrails.whitelist import CommandWhitelist
@@ -1679,11 +1678,11 @@ from harness.guardrails.patterns import PatternBlacklist
 
 
 class GuardrailEngine:
-    """Three-layer safety check for all tool invocations.
+    """所有工具调用的三层安全检查。
 
-    Layer 1: Path sandbox — restricts filesystem access boundaries
-    Layer 2: Command whitelist — only known-safe executables
-    Layer 3: Pattern blacklist — intercepts dangerous argument patterns
+    第 1 层：路径沙箱 —— 限制文件系统访问边界
+    第 2 层：命令白名单 —— 仅允许已知安全的可执行文件
+    第 3 层：模式黑名单 —— 拦截危险的参数模式
     """
 
     def __init__(self, sandbox_root: str, whitelist_extra: list[str] | None = None):
@@ -1692,61 +1691,62 @@ class GuardrailEngine:
         self._patterns = PatternBlacklist()
 
     def check(self, tool_call: ToolCall) -> GuardResult:
-        # Layer 1: Path sandbox for file operations
+        # 第 1 层：文件操作的路径沙箱
         if tool_call.name in ("read_file", "write_file"):
             mode = "write" if tool_call.name == "write_file" else "read"
             result = self._path_sandbox.validate(tool_call.arguments.get("path", ""), mode)
             if result.action != GuardAction.ALLOW:
                 return result
 
-        # Layer 2 & 3: Command safety for shell execution
+        # 第 2 层和第 3 层：shell 执行的命令安全性
         if tool_call.name in ("execute_shell", "run_tests"):
             command = tool_call.arguments.get("command", "")
             if command:
-                # Layer 2: Whitelist
+                # 第 2 层：白名单
                 result = self._whitelist.check(command)
                 if result.action != GuardAction.ALLOW:
                     return result
-                # Layer 3: Pattern blacklist
+                # 第 3 层：模式黑名单
                 result = self._patterns.check(command)
                 if result.action != GuardAction.ALLOW:
                     return result
 
-        return GuardResult(action=GuardAction.ALLOW, layer=0, reason="All checks passed")
+        return GuardResult(action=GuardAction.ALLOW, layer=0, reason="所有检查通过")
 ```
 
-- [ ] **Step 5: Run guardrail tests**
+- [ ] **步骤 5：运行护栏测试**
 
-Run: `pytest tests/unit/test_guardrail_sandbox.py tests/unit/test_guardrail_patterns.py -v`
-Expected: all PASS
+运行：`pytest tests/unit/test_guardrail_sandbox.py tests/unit/test_guardrail_patterns.py -v`
+预期结果：全部 PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add harness/guardrails/ tests/unit/test_guardrail_sandbox.py tests/unit/test_guardrail_patterns.py
-git commit -m "feat: add three-layer guardrail engine (path sandbox, command whitelist, regex blacklist)
+git commit -m "feat: 添加三层护栏引擎（路径沙箱、命令白名单、正则黑名单）
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 7: Feedback analyzer
+### 任务 7：反馈分析器
 
-**Files:**
-- Create: `harness/feedback/__init__.py`, `harness/feedback/analyzer.py`, `harness/feedback/pytest_parser.py`, `harness/feedback/retry_policy.py`
-- Create: `tests/unit/test_feedback_analyzer.py`, `tests/unit/test_feedback_retry.py`
+**文件：**
+- 创建：`harness/feedback/__init__.py`, `harness/feedback/analyzer.py`, `harness/feedback/pytest_parser.py`, `harness/feedback/retry_policy.py`
+- 创建：`tests/unit/test_feedback_analyzer.py`, `tests/unit/test_feedback_retry.py`
 
-**Interfaces:**
-- Consumes: `ToolResult`, `Feedback`, `Verdict`, `Failure` from Task 2
-- Produces: `FeedbackAnalyzer.analyze(result) -> Feedback`, `RetryPolicy.should_retry(count, feedback) -> bool`
+**接口：**
+- 消费：来自任务 2 的 `ToolResult`, `Feedback`, `Verdict`, `Failure`
+- 产出：`FeedbackAnalyzer.analyze(result) -> Feedback`, `RetryPolicy.should_retry(count, feedback) -> bool`
 
-- [ ] **Step 1: Write failing tests for FeedbackAnalyzer**
+- [ ] **步骤 1：为 FeedbackAnalyzer 编写失败的测试**
 
-Create `tests/unit/test_feedback_analyzer.py`:
+创建 `tests/unit/test_feedback_analyzer.py`：
 
 ```python
-"""Tests for feedback analyzer."""
+"""反馈分析器的测试。"""
+import pytest
 from harness.feedback.analyzer import FeedbackAnalyzer
 from harness.models import ToolResult, Feedback, Verdict, Failure
 
@@ -1775,12 +1775,12 @@ class TestFeedbackAnalyzer:
         assert "expected 200 got 401" in feedback.failures[0].message
 
     def test_nonzero_exit_code_without_structured_is_fail(self, analyzer):
-        result = ToolResult(tool_name="execute_shell", exit_code=1, stdout="", stderr="command not found")
+        result = ToolResult(tool_name="execute_shell", exit_code=1, stdout="", stderr="命令未找到")
         feedback = analyzer.analyze(result)
         assert feedback.verdict == Verdict.FAIL
 
     def test_read_file_returns_unknown(self, analyzer):
-        result = ToolResult(tool_name="read_file", exit_code=0, stdout="file contents")
+        result = ToolResult(tool_name="read_file", exit_code=0, stdout="文件内容")
         feedback = analyzer.analyze(result)
         assert feedback.verdict == Verdict.UNKNOWN
 
@@ -1792,10 +1792,11 @@ class TestFeedbackAnalyzer:
         assert "AssertionError" in feedback.suggested_fix
 ```
 
-Create `tests/unit/test_feedback_retry.py`:
+创建 `tests/unit/test_feedback_retry.py`：
 
 ```python
-"""Tests for retry policy."""
+"""重试策略的测试。"""
+import pytest
 from harness.feedback.retry_policy import RetryPolicy
 from harness.models import Feedback, Verdict, Failure
 
@@ -1831,32 +1832,32 @@ class TestRetryPolicy:
         assert policy.is_stuck() is False
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **步骤 2：运行测试以验证其失败**
 
-Run: `pytest tests/unit/test_feedback_analyzer.py tests/unit/test_feedback_retry.py -v`
-Expected: FAIL
+运行：`pytest tests/unit/test_feedback_analyzer.py tests/unit/test_feedback_retry.py -v`
+预期结果：FAIL
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Create `harness/feedback/__init__.py`:
+创建 `harness/feedback/__init__.py`：
 
 ```python
-"""Feedback analysis — the harness's self-correction engine."""
+"""反馈分析 —— 框架的自我修正引擎。"""
 from harness.feedback.analyzer import FeedbackAnalyzer
 from harness.feedback.retry_policy import RetryPolicy
 
 __all__ = ["FeedbackAnalyzer", "RetryPolicy"]
 ```
 
-Create `harness/feedback/pytest_parser.py`:
+创建 `harness/feedback/pytest_parser.py`：
 
 ```python
-"""Parse pytest JSON reports into structured failure lists."""
+"""将 pytest JSON 报告解析为结构化的失败列表。"""
 from harness.models import Failure
 
 
 def parse_pytest_structured(structured: dict) -> list[Failure]:
-    """Extract failures from a pytest JSON report's structured field."""
+    """从 pytest JSON 报告的结构化字段中提取失败信息。"""
     failures = []
     for f in structured.get("failures", []):
         failures.append(Failure(
@@ -1868,24 +1869,24 @@ def parse_pytest_structured(structured: dict) -> list[Failure]:
     return failures
 ```
 
-Create `harness/feedback/analyzer.py`:
+创建 `harness/feedback/analyzer.py`：
 
 ```python
-"""Main feedback analyzer — strategy dispatch based on tool type."""
+"""主反馈分析器 —— 基于工具类型的策略调度。"""
 from harness.models import ToolResult, Feedback, Verdict, Failure
 from harness.feedback.pytest_parser import parse_pytest_structured
 
 
 class FeedbackAnalyzer:
-    """Deterministic analyzer that converts tool results into Feedback signals.
+    """将工具结果转换为反馈信号的确定性分析器。
 
-    This is NOT a prompt-based analysis. Every verdict is computed by code:
-    exit codes, structured test reports, and file existence checks.
-    Remove the LLM and this still produces correct verdicts for testing.
+    这不是基于提示的分析。每个判定都由代码计算：
+    退出码、结构化测试报告和文件存在性检查。
+    移除 LLM，这仍然能为测试生成正确的判定结果。
     """
 
     def analyze(self, result: ToolResult) -> Feedback:
-        # Dispatch by tool type
+        # 按工具类型调度
         if result.tool_name == "run_tests":
             return self._analyze_test_results(result)
         elif result.tool_name == "execute_shell":
@@ -1893,10 +1894,10 @@ class FeedbackAnalyzer:
         elif result.tool_name == "write_file":
             return self._analyze_write(result)
         else:
-            # read_file, search_code — no objective signal
+            # read_file, search_code —— 无客观信号
             return Feedback(
                 verdict=Verdict.UNKNOWN,
-                summary=f"No objective feedback available for {result.tool_name}",
+                summary=f"没有关于 {result.tool_name} 的客观反馈",
             )
 
     def _analyze_test_results(self, result: ToolResult) -> Feedback:
@@ -1907,7 +1908,7 @@ class FeedbackAnalyzer:
         if result.structured:
             failures = parse_pytest_structured(result.structured)
 
-        summary = f"{len(failures)} test(s) failed" if failures else result.stderr[:500] or result.stdout[:500]
+        summary = f"{len(failures)} 个测试失败" if failures else (result.stderr[:500] or result.stdout[:500])
 
         suggested_fix = self._build_suggested_fix(failures, result)
 
@@ -1923,7 +1924,7 @@ class FeedbackAnalyzer:
             return Feedback(verdict=Verdict.PASS, summary=result.stdout[:500])
         return Feedback(
             verdict=Verdict.FAIL,
-            summary=result.stderr[:500] or f"Command failed with exit code {result.exit_code}",
+            summary=result.stderr[:500] or f"命令以退出码 {result.exit_code} 失败",
             failures=[Failure(file="shell", message=result.stderr[:200])],
         )
 
@@ -1932,29 +1933,29 @@ class FeedbackAnalyzer:
             return Feedback(verdict=Verdict.PASS, summary=result.stdout)
         return Feedback(
             verdict=Verdict.FAIL,
-            summary=result.stderr or "File write failed",
+            summary=result.stderr or "文件写入失败",
         )
 
     @staticmethod
     def _build_suggested_fix(failures: list[Failure], result: ToolResult) -> str:
         if not failures:
-            return result.stderr[:500] if result.stderr else "Investigate the failure and fix the issue."
-        lines = ["The following tests failed. Please fix the code to make them pass:\n"]
+            return result.stderr[:500] if result.stderr else "请调查失败原因并修复问题。"
+        lines = ["以下测试失败。请修复代码使其通过：\n"]
         for f in failures:
             loc = f"{f.file}:{f.line}" if f.line else f.file
             lines.append(f"- {f.function} ({loc}): {f.message[:120]}")
         return "\n".join(lines)
 ```
 
-Create `harness/feedback/retry_policy.py`:
+创建 `harness/feedback/retry_policy.py`：
 
 ```python
-"""Retry policy — limits self-correction attempts and detects stuck loops."""
+"""重试策略 —— 限制自我修正尝试次数并检测卡死循环。"""
 from harness.models import Feedback
 
 
 class RetryPolicy:
-    """Governs how many times the agent can retry after failure."""
+    """管理智能体在失败后可以重试的次数。"""
 
     def __init__(self, max_retries: int = 3):
         self._max_retries = max_retries
@@ -1967,11 +1968,11 @@ class RetryPolicy:
         self._history.append(feedback)
 
     def is_stuck(self) -> bool:
-        """Detect if the agent is producing the same failure repeatedly."""
+        """检测智能体是否反复产生相同的失败。"""
         if len(self._history) < 3:
             return False
         recent = self._history[-3:]
-        # Check if last 3 failures have identical failure signatures
+        # 检查最近 3 次失败是否具有相同的失败签名
         first = recent[0]
         return all(
             len(f.failures) == len(first.failures) and
@@ -1981,39 +1982,39 @@ class RetryPolicy:
         )
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：运行测试**
 
-Run: `pytest tests/unit/test_feedback_analyzer.py tests/unit/test_feedback_retry.py -v`
-Expected: all PASS
+运行：`pytest tests/unit/test_feedback_analyzer.py tests/unit/test_feedback_retry.py -v`
+预期结果：全部 PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add harness/feedback/ tests/unit/test_feedback_analyzer.py tests/unit/test_feedback_retry.py
-git commit -m "feat: add feedback analyzer with pytest parser and retry policy
+git commit -m "feat: 添加带有 pytest 解析器和重试策略的反馈分析器
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 8: State machine engine
+### 任务 8：状态机引擎
 
-**Files:**
-- Create: `harness/state_machine.py`
-- Create: `tests/unit/test_state_machine.py`
+**文件：**
+- 创建：`harness/state_machine.py`
+- 创建：`tests/unit/test_state_machine.py`
 
-**Interfaces:**
-- Consumes: `State`, `Verdict`, `GuardAction`, `LLMResponse` from Task 2
-- Consumes: `GuardrailEngine` from Task 6, `FeedbackAnalyzer` from Task 7
-- Produces: `transition(current_state, event) -> next_state` — pure function, fully testable
+**接口：**
+- 消费：来自任务 2 的 `State`, `Verdict`, `GuardAction`, `LLMResponse`
+- 消费：来自任务 6 的 `GuardrailEngine`，来自任务 7 的 `FeedbackAnalyzer`
+- 产出：`transition(current_state, event) -> next_state` —— 纯函数，完全可测试
 
-- [ ] **Step 1: Write failing tests for state machine**
+- [ ] **步骤 1：为状态机编写失败的测试**
 
-Create `tests/unit/test_state_machine.py`:
+创建 `tests/unit/test_state_machine.py`：
 
 ```python
-"""Tests for state machine transitions."""
+"""状态机转换的测试。"""
 from harness.state_machine import transition, EventType
 from harness.models import State
 
@@ -2057,23 +2058,23 @@ class TestStateMachine:
             assert transition(state, EventType.ERROR) == State.ERROR
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试以验证其失败**
 
-Run: `pytest tests/unit/test_state_machine.py -v`
-Expected: FAIL
+运行：`pytest tests/unit/test_state_machine.py -v`
+预期结果：FAIL
 
-- [ ] **Step 3: Implement state machine**
+- [ ] **步骤 3：实现状态机**
 
-Create `harness/state_machine.py`:
+创建 `harness/state_machine.py`：
 
 ```python
-"""Deterministic state machine for the agent loop."""
+"""智能体循环的确定性状态机。"""
 from enum import Enum
 from harness.models import State
 
 
 class EventType(str, Enum):
-    """Events that trigger state transitions."""
+    """触发状态转换的事件。"""
     TASK_SUBMIT = "task_submit"
     LLM_FINISH = "llm_finish"
     LLM_TOOL_USE = "llm_tool_use"
@@ -2091,7 +2092,7 @@ class EventType(str, Enum):
     ERROR = "error"
 
 
-# State transition table: (current_state, event) -> next_state
+# 状态转换表：(当前状态, 事件) -> 下一个状态
 TRANSITIONS: dict[tuple[State, EventType], State] = {
     (State.IDLE, EventType.TASK_SUBMIT): State.PLANNING,
 
@@ -2118,57 +2119,57 @@ TRANSITIONS: dict[tuple[State, EventType], State] = {
 
 
 def transition(current: State, event: EventType) -> State:
-    """Compute the next state given current state and event.
+    """根据当前状态和事件计算下一个状态。
 
-    This is a pure function — no LLM, no I/O, no side effects.
-    Removing the LLM entirely, this still deterministically returns the correct next state.
+    这是一个纯函数 —— 无 LLM、无 I/O、无副作用。
+    完全移除 LLM，它仍然可以确定性地返回正确的下一个状态。
     """
-    # ERROR event transitions from any state
+    # ERROR 事件可以从任何状态转换
     if event == EventType.ERROR:
         return State.ERROR
 
     key = (current, event)
     if key not in TRANSITIONS:
         raise ValueError(
-            f"No transition defined for ({current.value}, {event.value})"
+            f"未定义 ({current.value}, {event.value}) 的转换"
         )
     return TRANSITIONS[key]
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：运行测试**
 
-Run: `pytest tests/unit/test_state_machine.py -v`
-Expected: all PASS
+运行：`pytest tests/unit/test_state_machine.py -v`
+预期结果：全部 PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add harness/state_machine.py tests/unit/test_state_machine.py
-git commit -m "feat: add deterministic state machine engine with transition table
+git commit -m "feat: 添加带有转换表的确定性状态机引擎
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 9: Agent main loop
+### 任务 9：智能体主循环
 
-**Files:**
-- Create: `harness/loop.py`
-- Create: `tests/integration/test_agent_loop.py`
+**文件：**
+- 创建：`harness/loop.py`
+- 创建：`tests/integration/test_agent_loop.py`
 
-**Interfaces:**
-- Consumes: All previous components (Task 2-8)
-- Produces: `AgentLoop` with `run(task, llm_adapter, tools, guardrails, analyzer, policy) -> Session`
+**接口：**
+- 消费：所有先前组件（任务 2-8）
+- 产出：`AgentLoop`，包含 `run(task, llm_adapter, tools, guardrails, analyzer, policy) -> Session`
 
-- [ ] **Step 1: Write integration test with MockLLM**
+- [ ] **步骤 1：使用 MockLLM 编写集成测试**
 
-Create `tests/integration/__init__.py` (empty).
+创建 `tests/integration/__init__.py`（空文件）。
 
-Create `tests/integration/test_agent_loop.py`:
+创建 `tests/integration/test_agent_loop.py`：
 
 ```python
-"""Integration tests for the full agent loop with MockLLM."""
+"""使用 MockLLM 的完整智能体循环集成测试。"""
 import pytest
 from harness.loop import AgentLoop
 from harness.llm.mock import MockLLMAdapter
@@ -2205,48 +2206,48 @@ def policy():
 class TestAgentLoop:
     @pytest.mark.asyncio
     async def test_simple_complete_flow(self, tools, guardrails, analyzer, policy):
-        """Agent completes a task in one LLM turn (no tools needed)."""
+        """智能体在一个 LLM 回合内完成任务（无需工具）。"""
         mock = MockLLMAdapter([
-            LLMResponse(content="Task completed successfully!", stop_reason="complete"),
+            LLMResponse(content="任务成功完成！", stop_reason="complete"),
         ])
         loop = AgentLoop(tools, guardrails, analyzer, policy)
 
-        session = await loop.run("Say hello", mock)
+        session = await loop.run("Hello 打个招呼", mock)
 
         assert session.state == State.COMPLETED
         assert len(session.messages) >= 3  # system + user + assistant
-        assert "Task completed" in session.messages[-1].content
+        assert "任务成功完成" in session.messages[-1].content
 
     @pytest.mark.asyncio
     async def test_tool_use_and_recovery_flow(self, tools, guardrails, analyzer, policy):
-        """Agent uses a tool, gets feedback, and self-corrects."""
+        """智能体使用工具、获取反馈并自我修正。"""
         mock = MockLLMAdapter([
-            # Turn 1: LLM wants to run tests
+            # 第 1 回合：LLM 想要运行测试
             LLMResponse(
-                content="Let me run the tests first.",
+                content="让我先运行测试。",
                 stop_reason="tool_use",
                 tool_calls=[ToolCall(id="t1", name="execute_shell", arguments={"command": "python -m pytest tests/ -q"})],
             ),
-            # Turn 2: After observing failure, LLM fixes code
+            # 第 2 回合：观察到失败后，LLM 修复代码
             LLMResponse(
-                content="I see the test failure. Let me fix it.",
+                content="我看到了测试失败。让我修复它。",
                 stop_reason="tool_use",
                 tool_calls=[ToolCall(id="t2", name="execute_shell", arguments={"command": "echo 'fix applied'"})],
             ),
-            # Turn 3: LLM completes
-            LLMResponse(content="The fix is applied and tests should pass now.", stop_reason="complete"),
+            # 第 3 回合：LLM 完成
+            LLMResponse(content="修复已应用，测试现在应该能通过。", stop_reason="complete"),
         ])
         loop = AgentLoop(tools, guardrails, analyzer, policy)
 
-        session = await loop.run("Fix the failing tests", mock)
+        session = await loop.run("修复失败的测试", mock)
 
         assert session.state == State.COMPLETED
-        # Should have tool calls in history
+        # 历史记录中应有工具调用
         assert len(session.tool_calls) >= 2
 
     @pytest.mark.asyncio
     async def test_guardrail_intercepts_dangerous_command(self, tools, guardrails, analyzer, policy):
-        """Guardrail should block rm -rf / even when LLM tries it."""
+        """即使 LLM 尝试，护栏也应阻止 rm -rf /。"""
         mock = MockLLMAdapter([
             LLMResponse(
                 content="",
@@ -2256,20 +2257,20 @@ class TestAgentLoop:
         ])
         loop = AgentLoop(tools, guardrails, analyzer, policy)
 
-        session = await loop.run("Clean up", mock)
+        session = await loop.run("清理", mock)
 
-        # Should block, not execute
+        # 应阻止，不执行
         assert session.state == State.AWAITING_HUMAN
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：运行测试以验证其失败**
 
-Run: `pytest tests/integration/test_agent_loop.py -v`
-Expected: FAIL
+运行：`pytest tests/integration/test_agent_loop.py -v`
+预期结果：FAIL
 
-- [ ] **Step 3: Implement agent loop**
+- [ ] **步骤 3：实现智能体循环**
 
-Create `harness/loop.py`:
+创建 `harness/loop.py`：
 
 ```python
 """Agent main loop — the state machine executor."""
@@ -2458,11 +2459,11 @@ class AgentLoop:
         return calls
 ```
 
-Wait — I need to fix the loop to properly handle tool_calls from LLMResponse. Let me revise this.
+等等 —— 我需要修复循环以正确处理 LLMResponse 中的 tool_calls。让我修改这个版本。
 
-Actually, the issue is the loop needs to properly pass tool_calls from the LLM response through. The current design has a gap — the LLMResponse's tool_calls need to be stored somewhere for the EXECUTING state to find them. Let me fix this in the implementation.
+实际上，问题在于循环需要将 LLMResponse 中的 tool_calls 正确传递到 EXECUTING 状态可以找到的地方。当前设计存在缺口 —— LLMResponse 的 tool_calls 需要存储在某处供 EXECUTING 状态使用。让我在实现中修复这个问题。
 
-Let me write a cleaner version:
+让我写一个更干净的版本：
 
 ```python
 """Agent main loop — the state machine executor."""
@@ -2612,86 +2613,86 @@ class AgentLoop:
         return session
 ```
 
-OK this is cleaner. Let me put this into the plan file.
+这样更干净了。让我把这个放到计划文件中。
 
-- [ ] **Step 4: Run integration tests**
+- [ ] **步骤 4：运行集成测试**
 
-Run: `pytest tests/integration/test_agent_loop.py -v`
-Expected: tests pass (simple_complete and tool_use flows), guardrail test may need adjustment
+运行：`pytest tests/integration/test_agent_loop.py -v`
+预期结果：测试通过（simple_complete 和 tool_use 流程），护栏测试可能需要调整
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add harness/loop.py tests/integration/
-git commit -m "feat: add agent main loop integrating all components
+git commit -m "feat: 添加集成所有组件的智能体主循环
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 10: Memory, Config, and Credential managers
+### 任务 10：内存、配置和凭据管理器
 
-**Files:**
-- Create: `harness/memory/__init__.py`, `harness/memory/manager.py`
-- Create: `harness/config/__init__.py`, `harness/config/manager.py`
-- Create: `harness/credentials/__init__.py`, `harness/credentials/manager.py`
-- Create: `tests/unit/test_memory_manager.py`, `tests/unit/test_config_merge.py`, `tests/unit/test_credential_mask.py`
+**文件：**
+- 创建：`harness/memory/__init__.py`, `harness/memory/manager.py`
+- 创建：`harness/config/__init__.py`, `harness/config/manager.py`
+- 创建：`harness/credentials/__init__.py`, `harness/credentials/manager.py`
+- 创建：`tests/unit/test_memory_manager.py`, `tests/unit/test_config_merge.py`, `tests/unit/test_credential_mask.py`
 
-**Interfaces:**
-- Consumes: `ConfigData`, `Message` from Task 2
-- Produces: `MemoryManager.get_context(query) -> str`, `ConfigManager.load() -> ConfigData`, `CredentialManager.store/load/mask/status/delete`
+**接口：**
+- 消费：来自任务 2 的 `ConfigData`, `Message`
+- 产出：`MemoryManager.get_context(query) -> str`, `ConfigManager.load() -> ConfigData`, `CredentialManager.store/load/mask/status/delete`
 
-- [ ] **Step 1: Write tests**
+- [ ] **步骤 1：编写测试**
 
-Too large to show all three test files inline. Key test cases:
+三个测试文件内容较多，无法在此完整展示。关键测试用例：
 
-`test_memory_manager.py`:
-- `test_loads_project_conventions` — reads CLAUDE.md-style files
-- `test_stores_and_retrieves_decisions` — JSON file write/read cycle
-- `test_enforces_learnings_limit` — old entries trimmed
+`test_memory_manager.py`：
+- `test_loads_project_conventions` —— 读取类似 CLAUDE.md 的文件
+- `test_stores_and_retrieves_decisions` —— JSON 文件写入/读取循环
+- `test_enforces_learnings_limit` —— 旧条目被裁剪
 
-`test_config_merge.py`:
-- `test_project_overrides_global` — scalar field priority
-- `test_lists_are_appended` — `command_whitelist_extra` merges
-- `test_defaults_when_no_config` — returns built-in defaults
+`test_config_merge.py`：
+- `test_project_overrides_global` —— 标量字段优先级
+- `test_lists_are_appended` —— `command_whitelist_extra` 合并
+- `test_defaults_when_no_config` —— 返回内置默认值
 
-`test_credential_mask.py`:
-- `test_mask_hides_middle_characters` — `sk-ant-api03-abc...xyz` becomes `sk-...axyz`
-- `test_status_never_returns_plaintext` — `status()` returns masked only
-- `test_store_and_delete_cycle` — after delete, `status()` returns "not configured"
+`test_credential_mask.py`：
+- `test_mask_hides_middle_characters` —— `sk-ant-api03-abc...xyz` 变为 `sk-...axyz`
+- `test_status_never_returns_plaintext` —— `status()` 仅返回脱敏内容
+- `test_store_and_delete_cycle` —— 删除后，`status()` 返回 "not configured"
 
-- [ ] **Step 2: Implement**
+- [ ] **步骤 2：实现**
 
-Each manager is a self-contained module:
+每个管理器都是独立的模块：
 
-`MemoryManager`: reads `.harness/memory/` directory, stores decisions/learnings as JSON files with `{timestamp}_{tag}.json` naming, loads top N by recency.
+`MemoryManager`：读取 `.harness/memory/` 目录，将决策/经验以 JSON 文件形式存储，使用 `{timestamp}_{tag}.json` 命名，按时间倒序加载前 N 条。
 
-`ConfigManager`: loads `.harness/config.yaml` and `~/.harness/config.yaml`, deep-merges with dict precedence (project > global > default), returns `ConfigData` Pydantic model.
+`ConfigManager`：加载 `.harness/config.yaml` 和 `~/.harness/config.yaml`，使用字典优先级深度合并（项目 > 全局 > 默认），返回 `ConfigData` Pydantic 模型。
 
-`CredentialManager`: tries `keyring.get_password("lite-agent-harness", provider)` first; on `keyring.errors.KeyringError`, falls back to AES-GCM encrypted file at `.harness/credentials/{provider}.enc`, decrypted with `HARNESS_KEY_PASSWORD` env var. `mask()` shows first 3 and last 4 chars. `status()` returns "configured (sk-...ab12)" or "not configured".
+`CredentialManager`：首先尝试 `keyring.get_password("glimmer", provider)`；如果出现 `keyring.errors.KeyringError`，回退到 AES-GCM 加密文件，存储在 `.harness/credentials/{provider}.enc`，使用 `HARNESS_KEY_PASSWORD` 环境变量解密。`mask()` 显示前 3 个和后 4 个字符。`status()` 返回 "configured (sk-...ab12)" 或 "not configured"。
 
-- [ ] **Step 3: Run tests and commit**
+- [ ] **步骤 3：运行测试并提交**
 
-Direct implementation following the test patterns above. Full code available in the repository.
+直接按照上述测试模式实现。完整代码可在仓库中找到。
 
 ---
 
-### Task 11: FastAPI server + WebSocket handler
+### 任务 11：FastAPI 服务器 + WebSocket 处理器
 
-**Files:**
-- Create: `server/__init__.py`, `server/main.py`, `server/ws_handler.py`
-- Create: `server/api/__init__.py`, `server/api/config_routes.py`, `server/api/credential_routes.py`, `server/api/session_routes.py`
+**文件：**
+- 创建：`server/__init__.py`, `server/main.py`, `server/ws_handler.py`
+- 创建：`server/api/__init__.py`, `server/api/config_routes.py`, `server/api/credential_routes.py`, `server/api/session_routes.py`
 
-Key implementation:
-- `server/main.py`: FastAPI app with CORS (localhost dev), mounted REST routers, WebSocket endpoint at `/ws/session`
-- `server/ws_handler.py`: manages WebSocket lifecycle — creates `AgentLoop`, spawns async `run()`, sends `state.change`, `llm.stream`, `tool.invoke`, `tool.result`, `guardrail.pending`, `feedback.analysis`, `session.complete` messages via WebSocket JSON
-- REST endpoints wired to ConfigManager and CredentialManager
+关键实现：
+- `server/main.py`：FastAPI 应用，带 CORS（localhost 开发环境），挂载 REST 路由器，WebSocket 端点位于 `/ws/session`
+- `server/ws_handler.py`：管理 WebSocket 生命周期 —— 创建 `AgentLoop`，启动异步 `run()`，通过 WebSocket JSON 发送 `state.change`, `llm.stream`, `tool.invoke`, `tool.result`, `guardrail.pending`, `feedback.analysis`, `session.complete` 消息
+- REST 端点连接到 ConfigManager 和 CredentialManager
 
-- [ ] **Step 1: Implement server/main.py**
+- [ ] **步骤 1：实现 server/main.py**
 
 ```python
-"""FastAPI application entry point."""
+"""FastAPI 应用程序入口点。"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -2701,7 +2702,7 @@ from server.api.config_routes import router as config_router
 from server.api.credential_routes import router as credential_router
 from server.api.session_routes import router as session_router
 
-app = FastAPI(title="Lite Agent Harness", version="0.1.0")
+app = FastAPI(title="Glimmer", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
 
 app.include_router(ws_router)
@@ -2709,46 +2710,46 @@ app.include_router(config_router, prefix="/api")
 app.include_router(credential_router, prefix="/api")
 app.include_router(session_router, prefix="/api")
 
-# Serve frontend static files in production
+# 生产环境中提供前端静态文件
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/", StaticFiles(directory=str(static_dir), html=True))
 ```
 
-- [ ] **Step 4: Verify server starts**
+- [ ] **步骤 4：验证服务器启动**
 
-Run: `uvicorn server.main:app --host 127.0.0.1 --port 8000 &`
-Run: `curl http://localhost:8000/api/config`
-Expected: JSON config response
-
----
-
-### Task 12-16: Frontend, Demos, README, Docker, PyInstaller
-
-These are standard tasks following the same pattern: write tests first → implement → commit.
-
-Due to response length, I'll summarize key deliverables:
-
-**Task 12 (Frontend)**: React + Vite + TypeScript project with Open Design / Linear design system. Components: ChatView (WebSocket-driven message list), ToolCard (collapsible), FeedbackBanner (green/red/yellow), InputBar, StateIndicator, SettingsPanel (provider/model/API key forms), GuardrailModal (approve/reject dialog), HistorySidebar. All styles use structured CSS design tokens from Linear (see `DESIGN.md` for full token reference). Build output to `server/static/`.
-
-**Task 13 (Integration tests)**: WebSocket lifecycle test using `httpx.AsyncClient` + `TestClient`.
-
-**Task 14 (Demos)**: Three scripts — `demo_guardrail.py` (MockLLM tries `rm -rf /` → asserts BLOCK), `demo_feedback_loop.py` (inject test failure → assert correction loop completes), `demo_sandbox.py` (path escape → asserts BLOCK).
-
-**Task 15 (Docker + PyInstaller)**: `Dockerfile` — multi-stage build (frontend → static, backend → pip install, combined). `pyinstaller.spec` — single-file executable.
-
-**Task 16 (README + docs)**: Complete README with install, run, distribution commands, security boundary notes, known limitations.
+运行：`uvicorn server.main:app --host 127.0.0.1 --port 8000 &`
+运行：`curl http://localhost:8000/api/config`
+预期结果：JSON 配置响应
 
 ---
 
-## Plan Completion Checklist
+### 任务 12-16：前端、演示、README、Docker、PyInstaller
 
-After all 16 tasks complete, verify:
-- [ ] `make test-unit` passes (0 network calls)
-- [ ] `make test-integration` passes
-- [ ] Three demo scripts run deterministically
-- [ ] `make run` starts server, Web UI accessible at localhost:8000
-- [ ] `make build-docker` builds image, `docker run -p 8000:8000 harness` serves app
-- [ ] `make build-binary` produces working executable
-- [ ] No API keys in git history: `git log -p | grep -i sk-` returns nothing
-- [ ] `.harness/` and `.env` excluded in `.gitignore`
+这些是遵循相同模式的标准任务：先编写测试 → 实现 → 提交。
+
+由于响应长度限制，我将总结关键交付物：
+
+**任务 12（前端）**：React + Vite + TypeScript 项目，使用 Open Design / Linear 设计系统。组件：ChatView（WebSocket 驱动的消息列表）、ToolCard（可折叠）、FeedbackBanner（绿色/红色/黄色）、InputBar、StateIndicator、SettingsPanel（提供者/模型/API 密钥表单）、GuardrailModal（批准/拒绝对话框）、HistorySidebar。所有样式使用 Linear 的结构化 CSS 设计 token（完整 token 参考见 `DESIGN.md`）。构建输出到 `server/static/`。
+
+**任务 13（集成测试）**：使用 `httpx.AsyncClient` + `TestClient` 的 WebSocket 生命周期测试。
+
+**任务 14（演示）**：三个脚本 —— `demo_guardrail.py`（MockLLM 尝试 `rm -rf /` → 断言 BLOCK）、`demo_feedback_loop.py`（注入测试失败 → 断言修正循环完成）、`demo_sandbox.py`（路径逃逸 → 断言 BLOCK）。
+
+**任务 15（Docker + PyInstaller）**：`Dockerfile` —— 多阶段构建（前端 → 静态文件，后端 → pip install，合并）。`pyinstaller.spec` —— 单个可执行文件。
+
+**任务 16（README + 文档）**：完整的 README，包含安装、运行、分发命令、安全边界说明、已知限制。
+
+---
+
+## 计划完成检查清单
+
+所有 16 个任务完成后，验证：
+- [ ] `make test-unit` 通过（零网络调用）
+- [ ] `make test-integration` 通过
+- [ ] 三个演示脚本确定性运行
+- [ ] `make run` 启动服务器，Web UI 可通过 localhost:8000 访问
+- [ ] `make build-docker` 构建镜像，`docker run -p 8000:8000 harness` 提供应用服务
+- [ ] `make build-binary` 生成可执行文件
+- [ ] git 历史中无 API 密钥：`git log -p | grep -i sk-` 无返回结果
+- [ ] `.harness/` 和 `.env` 在 `.gitignore` 中被排除

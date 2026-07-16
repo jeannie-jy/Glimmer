@@ -27,6 +27,7 @@ export interface SessionInfo {
   currentTask: string;
   retryCount: number;
   pendingGuardrail: PendingGuardrail | null;
+  sessionId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,7 @@ export function useSession(
     let state: AgentState = 'idle';
     let retryCount = 0;
     let pendingGuardrail: PendingGuardrail | null = null;
+    let sessionId = '';
 
     for (const msg of messages) {
       switch (msg.type) {
@@ -58,19 +60,18 @@ export function useSession(
             args: msg.args,
           };
           break;
-        case 'guardrail.approve':
-        case 'guardrail.reject':
-          pendingGuardrail = null;
-          break;
         case 'session.complete':
           state = 'completed';
           break;
         case 'session.error':
           state = 'error';
           break;
+        case 'session.created':
+          sessionId = msg.session_id;
+          break;
       }
     }
 
-    return { state, currentTask: task, retryCount, pendingGuardrail };
+    return { state, currentTask: task, retryCount, pendingGuardrail, sessionId };
   }, [messages, task]);
 }

@@ -1,10 +1,16 @@
-/** REST API client for the Lite Agent Harness backend. */
+/** REST API client for the Glimmer backend. */
 
-const BASE = 'http://localhost:8000';
+const BASE = '';
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('glimmer_token');
+  return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
 
 export interface ConfigData {
   model_provider: string;
   model_id: string;
+  base_url: string;
   max_tokens: number;
   max_retries: number;
   sandbox_root: string;
@@ -24,7 +30,7 @@ export interface CredentialsStatus {
 // ---------------------------------------------------------------------------
 
 export async function getConfig(): Promise<ConfigData> {
-  const res = await fetch(`${BASE}/api/config`);
+  const res = await fetch(`${BASE}/api/config`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`GET /api/config failed: ${res.status}`);
   return res.json();
 }
@@ -34,7 +40,7 @@ export async function updateConfig(
 ): Promise<{ status: string; config: ConfigData }> {
   const res = await fetch(`${BASE}/api/config`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error(`PUT /api/config failed: ${res.status}`);
@@ -46,7 +52,7 @@ export async function updateConfig(
 // ---------------------------------------------------------------------------
 
 export async function getCredentialsStatus(): Promise<CredentialsStatus> {
-  const res = await fetch(`${BASE}/api/credentials/status`);
+  const res = await fetch(`${BASE}/api/credentials/status`, { headers: authHeaders() });
   if (!res.ok)
     throw new Error(`GET /api/credentials/status failed: ${res.status}`);
   return res.json();
@@ -58,7 +64,7 @@ export async function storeCredential(
 ): Promise<void> {
   const res = await fetch(`${BASE}/api/credentials`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ provider, api_key: apiKey }),
   });
   if (!res.ok) throw new Error(`POST /api/credentials failed: ${res.status}`);
@@ -67,6 +73,7 @@ export async function storeCredential(
 export async function deleteCredential(provider: string): Promise<void> {
   const res = await fetch(`${BASE}/api/credentials/${provider}`, {
     method: 'DELETE',
+    headers: authHeaders(),
   });
   if (!res.ok)
     throw new Error(`DELETE /api/credentials/${provider} failed: ${res.status}`);
@@ -77,8 +84,23 @@ export async function deleteCredential(provider: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function getSessionHistory(): Promise<{ sessions: unknown[] }> {
-  const res = await fetch(`${BASE}/api/session/history`);
+  const res = await fetch(`${BASE}/api/sessions`, { headers: authHeaders() });
   if (!res.ok)
-    throw new Error(`GET /api/session/history failed: ${res.status}`);
+    throw new Error(`GET /api/sessions failed: ${res.status}`);
+  return res.json();
+}
+
+export interface LoadedSession {
+  id: string;
+  task: string;
+  status: string;
+  created_at: string;
+  messages: Array<{ type: string; payload: Record<string, unknown>; created_at: string }>;
+}
+
+export async function getSession(sessionId: string): Promise<LoadedSession> {
+  const res = await fetch(`${BASE}/api/sessions/${sessionId}`, { headers: authHeaders() });
+  if (!res.ok)
+    throw new Error(`GET /api/sessions/${sessionId} failed: ${res.status}`);
   return res.json();
 }
