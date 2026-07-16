@@ -13,8 +13,7 @@ from harness.tools.registry import ToolRegistry
 from harness.tools.shell import ExecuteShellTool
 
 from server import ws_handler
-from server.api.config_routes import router as config_router, configure as configure_config
-from server.api.credential_routes import router as credential_router, configure as configure_credential
+from server.api.config_routes import router as config_router, configure_fallback as configure_config
 from server.api.session_routes import router as session_router
 
 
@@ -54,7 +53,7 @@ def build_app(
     app = FastAPI(title="Test Harness")
 
     configure_config(config_manager, credential_manager)
-    configure_credential(config_manager, credential_manager)
+    configure_config(config_manager, credential_manager)
     ws_handler.configure(
         app,
         config_manager=config_manager,
@@ -65,7 +64,6 @@ def build_app(
 
     app.include_router(ws_handler.router)
     app.include_router(config_router, prefix="/api")
-    app.include_router(credential_router, prefix="/api")
     app.include_router(session_router, prefix="/api")
     return app
 
