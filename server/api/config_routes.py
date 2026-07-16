@@ -9,6 +9,7 @@ from harness.db.database import get_db
 from harness.db.models import User, UserConfig
 from server.api.auth_routes import get_current_user
 from harness.auth.crypto import encrypt_credential, decrypt_credential
+from harness.models import ConfigData
 
 router = APIRouter(tags=["config"])
 
@@ -156,6 +157,26 @@ async def delete_credential(
         cfg.api_key_enc = None
         await db.flush()
     return {"status": "ok"}
+
+
+async def get_user_config(user: User, db: AsyncSession) -> ConfigData | None:
+    """Helper: fetch user's config as ConfigData model (used by WebSocket handler)."""
+    if _is_local() and _fallback_config_manager:
+        cfg = _fallback_config_manager.load()
+        return cfg
+
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg is None:
+        return None
+    return ConfigData(
+        model_provider=cfg.provider,
+        model_id=cfg.model_id,
+        base_url=cfg.base_url or "",
+        max_tokens=cfg.max_tokens,
+        max_retries=cfg.max_retries,
+        timeout_seconds=cfg.timeout_seconds,
+    )
 
 
 async def get_user_api_key(user: User, db: AsyncSession) -> str | None:

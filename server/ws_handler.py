@@ -1,9 +1,13 @@
 """WebSocket handler for session lifecycle management."""
 import asyncio
+import os
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
 
+from harness.auth.jwt import get_user_id_from_token
 from harness.config import ConfigManager
 from harness.credentials import CredentialManager
 from harness.loop import AgentLoop
@@ -16,6 +20,10 @@ from harness.feedback.analyzer import FeedbackAnalyzer
 from harness.feedback.retry_policy import RetryPolicy
 from harness.llm import AnthropicAdapter, OpenAIAdapter, MockLLMAdapter
 from harness.models import ConfigData
+from harness.db.database import get_db
+from harness.db.models import User, Session as DBSession, Message as DBMessage
+from harness.sandbox.docker_manager import DockerManager
+from server.api.config_routes import get_user_api_key, get_user_config
 
 router = APIRouter()
 
@@ -78,6 +86,16 @@ async def websocket_session(websocket: WebSocket) -> None:
     """
     await websocket.accept()
 
+    # ---- Mode detection and JWT extraction ----
+    token = websocket.query_params.get("token", "")
+    user_id_from_jwt = get_user_id_from_token(token)
+    LOCAL_MODE = not os.environ.get("DATABASE_URL")
+
+    if not LOCAL_MODE and not user_id_from_jwt:
+        await websocket.send_json({"type": "session.error", "message": "Authentication required"})
+        await websocket.close(code=4001)
+        return
+
     # Resolve shared components from app.state
     app_state = websocket.app.state
     config_manager: ConfigManager | None = getattr(app_state, 'ws_config_manager', None)
@@ -97,19 +115,45 @@ async def websocket_session(websocket: WebSocket) -> None:
     task: str = raw.get("content", "")
 
     # ---- Resolve config & credentials ----
-    project_root = Path.cwd()
-    if config_manager is None:
-        config_manager = ConfigManager(project_root)
-    if credential_manager is None:
-        credential_manager = CredentialManager(project_root)
+    if LOCAL_MODE:
+        project_root = Path.cwd()
+        if config_manager is None:
+            config_manager = ConfigManager(project_root)
+        if credential_manager is None:
+            credential_manager = CredentialManager(project_root)
 
-    config: ConfigData = config_manager.load()
-    api_key: str | None = credential_manager.load(config.model_provider)
+        config: ConfigData = config_manager.load()
+        api_key: str | None = credential_manager.load(config.model_provider)
+        docker_mgr = None
+        container_id = None
+    else:
+        async for db_session in get_db():
+            result = await db_session.execute(select(User).where(User.id == user_id_from_jwt))
+            user = result.scalar_one_or_none()
+            if not user:
+                await websocket.send_json({"type": "session.error", "message": "User not found"})
+                await websocket.close(code=4001)
+                return
+
+            config = await get_user_config(user, db_session)
+            api_key = await get_user_api_key(user, db_session)
+            break
+
+        if config is None:
+            config = ConfigData()
+
+        # Create Docker sandbox container for this session
+        session_id = str(uuid.uuid4())
+        docker_mgr = DockerManager()
+        container_id = await docker_mgr.create(str(user.id), session_id)
 
     # ---- Create per-session components ----
-    tools = getattr(app_state, 'ws_tool_registry', None)
-    if tools is None:
-        tools = _build_default_tool_registry()
+    if LOCAL_MODE:
+        tools = getattr(app_state, 'ws_tool_registry', None)
+        if tools is None:
+            tools = _build_default_tool_registry()
+    else:
+        tools = _build_default_tool_registry(docker_mgr=docker_mgr, container_id=container_id)
     guardrails = GuardrailEngine(
         sandbox_root=config.sandbox_root,
         whitelist_extra=config.command_whitelist_extra,
@@ -138,12 +182,14 @@ async def websocket_session(websocket: WebSocket) -> None:
 
     # ---- Run in background ----
     cancel_event = asyncio.Event()
+    harness_session = None
 
     async def run_task() -> None:
+        nonlocal harness_session
         try:
-            session = await loop.run(task, llm)
+            harness_session = await loop.run(task, llm)
             # If the loop paused for human approval, wait for client response
-            while session.state.value == "awaiting_human":
+            while harness_session.state.value == "awaiting_human":
                 cancel_or_approve = asyncio.create_task(
                     _wait_for_human_response(websocket, cancel_event)
                 )
@@ -157,22 +203,50 @@ async def websocket_session(websocket: WebSocket) -> None:
                     break
 
                 if msg.get("type") == "guardrail.approve":
-                    loop.approve_pending(session)
+                    loop.approve_pending(harness_session)
                 elif msg.get("type") == "guardrail.reject":
-                    loop.reject_pending(session)
+                    loop.reject_pending(harness_session)
                 elif msg.get("type") == "session.cancel":
                     cancel_event.set()
                     await emit_to_ws("session.error", message="Cancelled by user")
                     return
 
                 # Continue the loop
-                session = await loop.resume(session, llm)
+                harness_session = await loop.resume(harness_session, llm)
 
         except Exception as exc:
             try:
                 await emit_to_ws("session.error", message=str(exc))
             except Exception:
                 pass
+        finally:
+            # Multi-user: save session + messages to DB
+            if not LOCAL_MODE and harness_session is not None:
+                try:
+                    async for db_s in get_db():
+                        status = "completed" if harness_session.state.value == "completed" else "error"
+                        db_sess = DBSession(
+                            id=uuid.UUID(harness_session.id),
+                            user_id=user.id,
+                            task=harness_session.task,
+                            status=status,
+                            container_id=container_id,
+                            retry_count=harness_session.retry_count,
+                        )
+                        db_s.add(db_sess)
+                        for msg in harness_session.messages:
+                            payload: dict = {"content": msg.content}
+                            if msg.tool_call_id:
+                                payload["tool_call_id"] = msg.tool_call_id
+                            db_s.add(DBMessage(
+                                session_id=uuid.UUID(harness_session.id),
+                                type=msg.role,
+                                payload=payload,
+                            ))
+                        await db_s.flush()
+                        break
+                except Exception:
+                    pass
 
     runner = asyncio.create_task(run_task())
 
@@ -209,18 +283,25 @@ async def websocket_session(websocket: WebSocket) -> None:
         except (asyncio.CancelledError, Exception):
             pass
 
+        # Multi-user: destroy Docker container
+        if not LOCAL_MODE and docker_mgr is not None and container_id is not None:
+            try:
+                await docker_mgr.destroy(container_id)
+            except Exception:
+                pass
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _build_default_tool_registry() -> ToolRegistry:
+def _build_default_tool_registry(docker_mgr=None, container_id=None) -> ToolRegistry:
     """Build and return the default set of tools."""
     registry = ToolRegistry()
     registry.register(ReadFileTool())
     registry.register(WriteFileTool())
-    registry.register(ExecuteShellTool())
-    registry.register(RunTestsTool())
+    registry.register(ExecuteShellTool(docker_mgr=docker_mgr, container_id=container_id))
+    registry.register(RunTestsTool(docker_mgr=docker_mgr, container_id=container_id))
     registry.register(SearchCodeTool())
     return registry
 

@@ -35,11 +35,15 @@ class AgentLoop:
         guardrails: GuardrailEngine,
         analyzer: FeedbackAnalyzer,
         policy: RetryPolicy,
+        docker_mgr: object | None = None,
+        container_id: str | None = None,
     ):
         self._tools = tools
         self._guardrails = guardrails
         self._analyzer = analyzer
         self._policy = policy
+        self._docker_mgr = docker_mgr
+        self._container_id = container_id
         self._on_event: Callable[..., Any] | None = None
 
     def on_event(self, handler: Callable[..., Any]) -> None:
