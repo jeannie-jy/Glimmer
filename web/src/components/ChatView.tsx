@@ -19,8 +19,7 @@ interface ChatViewProps {
 const ChatView: React.FC<ChatViewProps> = ({ messages, state, task, onSend, onStop, onNewSession, historyItems }) => {
   const isRunning = ['planning', 'executing', 'observing', 'correcting'].includes(state);
   const isAwaiting = state === 'awaiting_human';
-  const isViewingHistory = historyItems && historyItems.length > 0;
-  const disabled = isRunning || isAwaiting || isViewingHistory;
+  const disabled = isRunning || isAwaiting;
 
   return (
     <div className="chat-view">

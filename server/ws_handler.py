@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from harness.auth.jwt import get_user_id_from_token
 from harness.config import ConfigManager
@@ -148,7 +149,9 @@ async def _load_session_from_db(
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as db_s:
         result = await db_s.execute(
-            select(DBSession).where(
+            select(DBSession)
+            .options(selectinload(DBSession.messages))
+            .where(
                 DBSession.id == uuid.UUID(session_id),
                 DBSession.user_id == uuid.UUID(user_id),
             )
@@ -283,9 +286,26 @@ async def websocket_session(websocket: WebSocket) -> None:
             await websocket.send_json({"type": "session.error", "message": "Expected task.submit after session.load"})
             return
     else:
-        # task.submit as first message — create fresh session
+        # task.submit as first message — may continue an existing session
         task_content = raw.get("content", "")
-        harness_session = PydanticSession(id=str(uuid.uuid4()), task=task_content, state=State.IDLE)
+        load_id = raw.get("session_id", "")
+        is_resuming = False
+        if load_id and not LOCAL_MODE:
+            try:
+                loaded = await _load_session_from_db(load_id, user_id, get_db)
+                if loaded is not None:
+                    harness_session = loaded
+                    is_resuming = True
+                    print(f"[WS] Bootstrap: continuing session {harness_session.id}")
+                else:
+                    harness_session = PydanticSession(id=str(uuid.uuid4()), task=task_content, state=State.IDLE)
+            except Exception as e:
+                print(f"[WS] Bootstrap: failed to load session {load_id}: {e}")
+                await websocket.send_json({"type": "session.error", "message": f"Failed to load session: {e}"})
+                await websocket.close(code=4000)
+                return
+        if not is_resuming:
+            harness_session = PydanticSession(id=str(uuid.uuid4()), task=task_content, state=State.IDLE)
 
     # ---- Create per-session components (Docker container once per session) ----
     async def _create_docker_container() -> str | None:
@@ -426,6 +446,8 @@ async def websocket_session(websocket: WebSocket) -> None:
 
     # ---- First task (from bootstrap) ----
     if task_content:
+        if is_resuming:
+            await emit_to_ws("session.created", session_id=harness_session.id)
         harness_session = await run_one_turn(task_content)
         if harness_session is None:
             try: await websocket.close()
