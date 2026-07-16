@@ -2,7 +2,7 @@
 
 ---
 
-# Lite Agent Harness
+# Glimmer
 
 A lightweight, model-agnostic coding agent harness with deterministic guardrails and mock-driven testing.
 

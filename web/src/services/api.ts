@@ -1,4 +1,4 @@
-/** REST API client for the Lite Agent Harness backend. */
+/** REST API client for the Glimmer backend. */
 
 const BASE = 'http://localhost:8000';
 

@@ -22,7 +22,7 @@ const HeroSection: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
         >
-          Lite Agent Harness
+          Glimmer
         </motion.h1>
 
         <motion.p

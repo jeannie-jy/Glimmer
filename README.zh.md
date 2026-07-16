@@ -2,7 +2,7 @@
 
 ---
 
-# Lite Agent Harness
+# Glimmer
 
 一个轻量级、模型无关的编码智能体框架，具备确定性护栏和 mock 驱动测试能力。
 

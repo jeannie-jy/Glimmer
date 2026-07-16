@@ -20,7 +20,7 @@ const NavBar: React.FC = () => {
       <div className="nav__inner">
         <NavLink to="/" className="nav__logo" onClick={() => setMobileOpen(false)}>
           <span className="nav__logo-icon"><Sparkles size={20} /></span>
-          <span className="nav__logo-text">Lite Agent Harness</span>
+          <span className="nav__logo-text">Glimmer</span>
         </NavLink>
 
         <div className="nav__links">

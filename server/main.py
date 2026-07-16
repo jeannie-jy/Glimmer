@@ -1,4 +1,4 @@
-"""FastAPI application entry point for Lite Agent Harness."""
+"""FastAPI application entry point for Glimmer."""
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -23,7 +23,7 @@ def create_app(project_root: Path | None = None) -> FastAPI:
     """
     root = project_root or Path.cwd()
 
-    app = FastAPI(title="Lite Agent Harness", version="0.1.0")
+    app = FastAPI(title="Glimmer", version="0.1.0")
 
     app.add_middleware(
         CORSMiddleware,
