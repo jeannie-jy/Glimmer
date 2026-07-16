@@ -1,0 +1,18 @@
+.about-page { max-width: 900px; margin: 0 auto; padding: var(--space-8) var(--space-6); }
+.about-page__heading { font-size: var(--text-2xl); font-weight: var(--font-bold); color: var(--color-text-primary); margin-bottom: var(--space-2); position: relative; display: inline-block; }
+.about-page__heading::after { content: ''; position: absolute; left: 0; bottom: -4px; width: 60%; height: 3px; background: var(--gradient-magic-gold); border-radius: var(--radius-full); }
+.about-page__intro { font-size: var(--text-lg); color: var(--color-text-secondary); line-height: var(--leading-relaxed); margin-bottom: var(--space-8); margin-top: var(--space-4); }
+.about-page__tech { margin-top: var(--space-8); padding-top: var(--space-6); border-top: 1px solid var(--color-border-base); }
+.about-page__tech-title { font-size: var(--text-xl); font-weight: var(--font-bold); color: var(--color-text-primary); margin-bottom: var(--space-3); }
+.about-page__tech-stack { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.about-page__tech-tag { padding: var(--space-1) var(--space-3); background: var(--color-bg-element); border: 1px solid var(--color-border-base); border-radius: var(--radius-full); font-size: var(--text-sm); color: var(--color-text-secondary); font-weight: var(--font-medium); }
+.about-page__footer { margin-top: var(--space-6); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.feature-card { background: var(--color-bg-surface); border: 1px solid var(--color-border-base); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; transition: border-color var(--transition-normal); }
+.feature-card:hover { border-color: var(--color-accent-primary); }
+.feature-card__icon { font-size: 2rem; display: block; margin-bottom: var(--space-3); }
+.feature-card__title { font-size: var(--text-base); font-weight: var(--font-bold); color: var(--color-text-primary); margin-bottom: var(--space-1); }
+.feature-card__desc { font-size: var(--text-sm); color: var(--color-text-secondary); line-height: var(--leading-relaxed); }
+
+@media (max-width: 768px) { .feature-grid { grid-template-columns: 1fr; } }
