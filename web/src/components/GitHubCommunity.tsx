@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useGitHubStars } from '../hooks/useGitHubStars';
+import { Star, GitFork, Clipboard } from 'lucide-react';
 
 const REPO_URL = 'https://github.com/jingyu-wang/lite-agent-harness';
 
@@ -17,7 +18,7 @@ const GitHubCommunity: React.FC = () => {
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
       >
-        <h2 className="github-community__title">🌟 开源魔法，众人共创</h2>
+        <h2 className="github-community__title"><Star size={24} /> 开源魔法，众人共创</h2>
 
         {!loading && (
           <motion.div
@@ -26,17 +27,17 @@ const GitHubCommunity: React.FC = () => {
             whileInView={{ scale: 1 }}
             viewport={{ once: true }}
           >
-            <span className="github-community__stat">⭐ {stars.toLocaleString()} Stars</span>
-            <span className="github-community__stat">🍴 {forks.toLocaleString()} Forks</span>
+            <span className="github-community__stat"><Star size={18} /> {stars.toLocaleString()} Stars</span>
+            <span className="github-community__stat"><GitFork size={18} /> {forks.toLocaleString()} Forks</span>
           </motion.div>
         )}
 
         <div className="github-community__actions">
           <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="github-community__btn github-community__btn--primary">
-            ⭐ Star on GitHub
+            <Star size={18} /> Star on GitHub
           </a>
           <a href={`${REPO_URL}/issues`} target="_blank" rel="noopener noreferrer" className="github-community__btn github-community__btn--secondary">
-            📋 View Issues
+            <Clipboard size={18} /> View Issues
           </a>
         </div>
       </motion.div>

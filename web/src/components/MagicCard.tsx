@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 interface MagicCardProps {
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   description: string;
   to: string;

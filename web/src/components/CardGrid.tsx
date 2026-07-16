@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import MagicCard from './MagicCard';
+import { Wand2, ScrollText, GraduationCap } from 'lucide-react';
 
 const CARDS = [
-  { icon: '🔮', title: '项目简介', description: '了解 Lite Agent Harness 的核心魔法', to: '/about' },
-  { icon: '📜', title: '使用指南', description: '施展你的第一个代码咒语', to: '/guide' },
-  { icon: '🎓', title: '学习入口', description: '深入理解 Agent 的魔法原理', to: '/learn' },
+  { icon: <Wand2 size={32} />, title: '项目简介', description: '了解 Lite Agent Harness 的核心魔法', to: '/about' },
+  { icon: <ScrollText size={32} />, title: '使用指南', description: '施展你的第一个代码咒语', to: '/guide' },
+  { icon: <GraduationCap size={32} />, title: '学习入口', description: '深入理解 Agent 的魔法原理', to: '/learn' },
 ];
 
 const container = {

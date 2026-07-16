@@ -4,6 +4,7 @@ import type { AgentState } from '../hooks/useSession';
 import MessageList from './MessageList';
 import InputBar from './InputBar';
 import StateIndicator from './StateIndicator';
+import { Wand2 } from 'lucide-react';
 
 interface ChatViewProps {
   messages: WsServerMessage[];
@@ -20,7 +21,7 @@ const ChatView: React.FC<ChatViewProps> = ({ messages, state, onSend, onStop }) 
   return (
     <div className="chat-view">
       <div className="chat-view__header">
-        <h1 className="chat-view__title">🔮 Agent — 代码魔法</h1>
+        <h1 className="chat-view__title"><Wand2 size={22} /> Agent — 代码魔法</h1>
         <StateIndicator state={state} />
       </div>
       <MessageList messages={messages} />

@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import GitHubStarButton from './GitHubStarButton';
+import { Home, BookOpen, Compass, GraduationCap, Bot, Sparkles } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { path: '/', label: 'Home', icon: '🏠' },
-  { path: '/about', label: 'About', icon: '📖' },
-  { path: '/guide', label: 'Guide', icon: '🧭' },
-  { path: '/learn', label: 'Learn', icon: '🎓' },
-  { path: '/agent', label: 'Agent', icon: '🤖' },
+  { path: '/', label: 'Home', icon: <Home size={16} /> },
+  { path: '/about', label: 'About', icon: <BookOpen size={16} /> },
+  { path: '/guide', label: 'Guide', icon: <Compass size={16} /> },
+  { path: '/learn', label: 'Learn', icon: <GraduationCap size={16} /> },
+  { path: '/agent', label: 'Agent', icon: <Bot size={16} /> },
 ];
 
 const NavBar: React.FC = () => {
@@ -18,7 +19,7 @@ const NavBar: React.FC = () => {
     <nav className="nav">
       <div className="nav__inner">
         <NavLink to="/" className="nav__logo" onClick={() => setMobileOpen(false)}>
-          <span className="nav__logo-icon">✨</span>
+          <span className="nav__logo-icon"><Sparkles size={20} /></span>
           <span className="nav__logo-text">Lite Agent Harness</span>
         </NavLink>
 

@@ -7,6 +7,7 @@ import HistorySidebar from '../components/HistorySidebar';
 import SettingsPanel from '../components/SettingsPanel';
 import GuardrailModal from '../components/GuardrailModal';
 import '../styles/agent.css';
+import { Settings } from 'lucide-react';
 
 const AgentPage: React.FC = () => {
   const { send, messages, isConnected, connect, disconnect, error: wsError } = useWebSocket();
@@ -38,7 +39,7 @@ const AgentPage: React.FC = () => {
           {awaitingHuman && <div className="agent-page__awaiting-banner">Agent is waiting for your approval.</div>}
         </main>
         <aside className="agent-page__sidebar agent-page__sidebar--right">
-          <button className="agent-page__settings-toggle" onClick={() => setSettingsOpen(!settingsOpen)} type="button">{settingsOpen ? 'Close Settings' : '⚙️ Settings'}</button>
+          <button className="agent-page__settings-toggle" onClick={() => setSettingsOpen(!settingsOpen)} type="button">{settingsOpen ? 'Close Settings' : <><Settings size={16} /> Settings</>}</button>
           {settingsOpen && <SettingsPanel />}
         </aside>
         <GuardrailModal guardrail={pendingGuardrail} onApprove={handleGuardrailApprove} onReject={handleGuardrailReject} />

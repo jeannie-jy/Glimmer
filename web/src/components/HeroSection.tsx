@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import FairySprite from './FairySprite';
+import { Sparkles, BookOpen } from 'lucide-react';
 
 const HeroSection: React.FC = () => {
   const navigate = useNavigate();
@@ -59,10 +60,10 @@ const HeroSection: React.FC = () => {
           transition={{ duration: 0.8, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <button className="hero__btn hero__btn--primary" onClick={() => navigate('/agent')}>
-            <span className="hero__btn-icon">✨</span> 开始施法
+            <span className="hero__btn-icon"><Sparkles size={20} /></span> 开始施法
           </button>
           <button className="hero__btn hero__btn--secondary" onClick={scrollToCards}>
-            <span className="hero__btn-icon">📖</span> 了解更多
+            <span className="hero__btn-icon"><BookOpen size={20} /></span> 了解更多
           </button>
         </motion.div>
       </div>

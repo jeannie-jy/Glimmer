@@ -1,13 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Brain, Shield, BarChart3, Zap, KeyRound, Container } from 'lucide-react';
 
 const FEATURES = [
-  { icon: '🧠', title: '多模型支持', desc: 'Anthropic Messages API 和 OpenAI Chat Completions API，统一抽象接口' },
-  { icon: '🛡️', title: '三层护栏', desc: '路径沙箱 + 命令白名单 + 正则黑名单，层层安全防护' },
-  { icon: '📊', title: '确定性反馈', desc: '基于 exit code 和结构化报告的反馈分析，不依赖 LLM 判断' },
-  { icon: '⚡', title: '状态机驱动', desc: '纯函数状态转换表，确定性路由，零 LLM 参与决策' },
-  { icon: '🔐', title: '凭证加密', desc: 'OS Keyring（桌面）+ AES-GCM（Docker），密钥不落盘' },
-  { icon: '🐳', title: 'Docker 支持', desc: '多阶段构建，Docker + PyInstaller 双分发方案' },
+  { icon: <Brain size={24} />, title: '多模型支持', desc: 'Anthropic Messages API 和 OpenAI Chat Completions API，统一抽象接口' },
+  { icon: <Shield size={24} />, title: '三层护栏', desc: '路径沙箱 + 命令白名单 + 正则黑名单，层层安全防护' },
+  { icon: <BarChart3 size={24} />, title: '确定性反馈', desc: '基于 exit code 和结构化报告的反馈分析，不依赖 LLM 判断' },
+  { icon: <Zap size={24} />, title: '状态机驱动', desc: '纯函数状态转换表，确定性路由，零 LLM 参与决策' },
+  { icon: <KeyRound size={24} />, title: '凭证加密', desc: 'OS Keyring（桌面）+ AES-GCM（Docker），密钥不落盘' },
+  { icon: <Container size={24} />, title: 'Docker 支持', desc: '多阶段构建，Docker + PyInstaller 双分发方案' },
 ];
 
 const container = {
