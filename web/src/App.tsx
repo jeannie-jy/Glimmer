@@ -8,6 +8,9 @@ import AboutPage from './pages/AboutPage';
 import GuidePage from './pages/GuidePage';
 import LearnPage from './pages/LearnPage';
 import AgentPage from './pages/AgentPage';
+import LoginPage from './pages/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './contexts/AuthContext';
 import './styles/magic-animations.css';
 import './styles/nav.css';
 
@@ -24,7 +27,7 @@ const App: React.FC = () => {
   const location = useLocation();
 
   return (
-    <>
+    <AuthProvider>
       <ParticleCanvas />
       <NavBar />
       <main style={{ paddingTop: 56, minHeight: '100vh' }}>
@@ -34,12 +37,13 @@ const App: React.FC = () => {
             <Route path="/about" element={<AboutPage />} />
             <Route path="/guide" element={<GuidePage />} />
             <Route path="/learn" element={<LearnPage />} />
-            <Route path="/agent" element={<AgentPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
             <Route path="/github" element={<GitHubRedirect />} />
           </Routes>
         </AnimatePresence>
       </main>
-    </>
+    </AuthProvider>
   );
 };
 

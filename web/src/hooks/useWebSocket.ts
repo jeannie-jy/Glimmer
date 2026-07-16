@@ -34,7 +34,12 @@ export interface UseWebSocketReturn {
 // Hook
 // ---------------------------------------------------------------------------
 
-const WS_URL = 'ws://localhost:8000/ws/session';
+const _getWsUrl = () => {
+  const token = localStorage.getItem('glimmer_token');
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const tokenParam = token ? `?token=${token}` : '';
+  return `${protocol}//${location.host}/ws/session${tokenParam}`;
+};
 
 export function useWebSocket(): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
@@ -58,7 +63,7 @@ export function useWebSocket(): UseWebSocketReturn {
     setError(null);
     setMessages([]);
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(_getWsUrl());
 
     ws.onopen = () => {
       setIsConnected(true);
