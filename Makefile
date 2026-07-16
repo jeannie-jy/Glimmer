@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration run build-docker build-binary clean
+.PHONY: test test-unit test-integration run dev build-web build-sandbox build-docker deploy clean
 
 test: test-unit test-integration
 
@@ -11,14 +11,20 @@ test-integration:
 run:
 	uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
 
+dev:
+	uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
+
 build-web:
 	cd web && npm install && npm run build
 
-build-docker:
-	docker build -t lite-agent-harness .
+build-sandbox:
+	docker build -f Dockerfile.sandbox -t glimmer-sandbox:latest .
 
-build-binary:
-	pyinstaller pyinstaller.spec
+build-docker:
+	docker build -t glimmer .
+
+deploy: build-sandbox
+	docker compose up -d
 
 clean:
 	rm -rf build/ dist/ __pycache__/ .pytest_cache/ web/dist/

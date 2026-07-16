@@ -1,6 +1,6 @@
 # Glimmer
 
-A lightweight, model-agnostic AI coding agent with deterministic guardrails, Docker sandbox isolation, and a fairy-tale themed web UI.
+A lightweight, model-agnostic AI coding agent with deterministic guardrails, and Docker sandbox isolation.
 
 > "每一次编码，都是一场施法" — SpellCraft your code with Glimmer.
 
@@ -22,23 +22,31 @@ A lightweight, model-agnostic AI coding agent with deterministic guardrails, Doc
 
 ## Quick Start
 
-### Local single-user mode
+### Local mode (single user, no Docker)
 
 ```bash
 pip install -r requirements.txt
-uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
+make dev
 # Open http://localhost:8000
 ```
 
-### Multi-user mode (requires PostgreSQL + Docker)
+Open Settings in the sidebar, enter your API key, and start casting spells.
+
+### Deploy mode (multi-user, Docker)
 
 ```bash
-export GITHUB_CLIENT_ID=your_github_oauth_client_id
-export GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
-export GLIMMER_SECRET_KEY=$(openssl rand -hex 32)
-export DB_PASSWORD=your_db_password
-docker-compose up -d
+# 1. Configure environment
+cp .env.example .env
+# Edit .env — set GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, passwords
+
+# 2. One-command deploy
+make deploy
+# Open http://localhost
 ```
+
+This builds the sandbox image, then starts nginx + API + PostgreSQL.
+
+**Prerequisites:** Docker, Docker Compose, and a [GitHub OAuth App](https://github.com/settings/developers).
 
 ---
 

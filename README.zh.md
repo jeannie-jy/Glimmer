@@ -1,6 +1,6 @@
 # Glimmer
 
-轻量级、模型无关的 AI 编程智能体，具备确定性护栏、Docker 沙箱隔离和童话主题 Web 界面。
+轻量级、模型无关的 AI 编程智能体，具备确定性护栏、Docker 沙箱隔离。
 
 > "每一次编码，都是一场施法"
 
@@ -22,23 +22,31 @@
 
 ## 快速开始
 
-### 本地单用户模式
+### 本地模式（单用户，无需 Docker）
 
 ```bash
 pip install -r requirements.txt
-uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
+make dev
 # 浏览器打开 http://localhost:8000
 ```
 
-### 多用户模式（需要 PostgreSQL + Docker）
+打开右侧 Settings 面板，填入 API Key，即可开始施法。
+
+### 部署模式（多用户，需要 Docker）
 
 ```bash
-export GITHUB_CLIENT_ID=你的GitHub_OAuth_Client_ID
-export GITHUB_CLIENT_SECRET=你的GitHub_OAuth_Client_Secret
-export GLIMMER_SECRET_KEY=$(openssl rand -hex 32)
-export DB_PASSWORD=你的数据库密码
-docker-compose up -d
+# 1. 配置环境变量
+cp .env.example .env
+# 编辑 .env — 填入 GITHUB_CLIENT_ID、GITHUB_CLIENT_SECRET 和密码
+
+# 2. 一键部署
+make deploy
+# 浏览器打开 http://localhost
 ```
+
+一键构建沙箱镜像 + 启动 nginx + API + PostgreSQL。
+
+**前置条件：** Docker、Docker Compose、[GitHub OAuth App](https://github.com/settings/developers)。
 
 ---
 
