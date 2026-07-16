@@ -1,104 +1,170 @@
-"""REST endpoints for harness configuration."""
-from pathlib import Path
-
-from fastapi import APIRouter, HTTPException
+"""Per-user configuration REST endpoints."""
+import os
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from harness.config import ConfigManager
-from harness.credentials import CredentialManager
+from harness.db.database import get_db
+from harness.db.models import User, UserConfig
+from server.api.auth_routes import get_current_user
+from harness.auth.crypto import encrypt_credential, decrypt_credential
 
 router = APIRouter(tags=["config"])
 
-# Shared references — set from main.py via configure()
-_config_manager: ConfigManager | None = None
-_credential_manager: CredentialManager | None = None
+# Fallback for local mode (no DATABASE_URL) -- set from main.py
+_fallback_config_manager = None
+_fallback_credential_manager = None
 
 
-def configure(config_manager: ConfigManager, credential_manager: CredentialManager) -> None:
-    """Inject shared service instances (called at startup)."""
-    global _config_manager, _credential_manager
-    _config_manager = config_manager
-    _credential_manager = credential_manager
+def configure_fallback(config_mgr, cred_mgr):
+    global _fallback_config_manager, _fallback_credential_manager
+    _fallback_config_manager = config_mgr
+    _fallback_credential_manager = cred_mgr
 
-
-# ---------------------------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------------------------
 
 class ConfigUpdate(BaseModel):
-    """Partial config update payload."""
-    model_provider: str | None = None
-    model_id: str | None = None
+    provider: str | None = None
     base_url: str | None = None
+    model_id: str | None = None
     max_tokens: int | None = None
     max_retries: int | None = None
-    sandbox_root: str | None = None
-    command_whitelist_extra: list[str] | None = None
     timeout_seconds: int | None = None
-    enabled_tools: list[str] | None = None
-    max_context_tokens: int | None = None
-    learnings_limit: int | None = None
+
+class CredentialStore(BaseModel):
+    api_key: str
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
+# ---- Local mode helpers ----
+def _is_local() -> bool:
+    return not os.environ.get("DATABASE_URL")
+
 
 @router.get("/config")
-async def get_config() -> dict:
-    """Return the current configuration (credential values masked)."""
-    if _config_manager is None:
-        raise HTTPException(status_code=503, detail="Server not fully initialised")
+async def get_config(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if _is_local() and _fallback_config_manager:
+        cfg = _fallback_config_manager.load()
+        return cfg.model_dump()
 
-    config = _config_manager.load()
-    data = config.model_dump()
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg is None:
+        cfg = UserConfig(user_id=user.id)
+        db.add(cfg)
+        await db.flush()
 
-    # Mask any credential-like fields
-    if "api_key" in data:
-        data["api_key"] = _mask_key(data["api_key"])
-    if "api_key" in data.get("model", {}):
-        data["model"]["api_key"] = _mask_key(data["model"]["api_key"])
-
-    return data
+    return {
+        "provider": cfg.provider,
+        "base_url": cfg.base_url or "",
+        "model_id": cfg.model_id,
+        "max_tokens": cfg.max_tokens,
+        "max_retries": cfg.max_retries,
+        "timeout_seconds": cfg.timeout_seconds,
+        "model_provider": cfg.provider,
+        "has_api_key": bool(cfg.api_key_enc),
+        "command_whitelist_extra": [],
+        "sandbox_root": ".",
+        "enabled_tools": ["read_file", "write_file", "execute_shell", "run_tests", "search_code"],
+        "max_context_tokens": 8000,
+        "learnings_limit": 20,
+    }
 
 
 @router.put("/config")
-async def update_config(update: ConfigUpdate) -> dict:
-    """Update the project-level configuration file.
+async def update_config(
+    update: ConfigUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if _is_local() and _fallback_config_manager:
+        # Local mode: write to yaml file
+        from harness.models import ConfigData
+        current = _fallback_config_manager.load()
+        for k, v in update.model_dump(exclude_none=True).items():
+            if hasattr(current, k) and v is not None:
+                setattr(current, k, v)
+        import yaml
+        project_cfg = _fallback_config_manager.project_root / ".harness" / "config.yaml"
+        project_cfg.parent.mkdir(parents=True, exist_ok=True)
+        with open(project_cfg, "w") as fh:
+            yaml.dump(current.model_dump(), fh, default_flow_style=False)
+        return {"status": "ok", "config": current.model_dump()}
 
-    Only the fields provided in the request body are changed; missing fields
-    keep their current value.
-    """
-    if _config_manager is None:
-        raise HTTPException(status_code=503, detail="Server not fully initialised")
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg is None:
+        cfg = UserConfig(user_id=user.id)
+        db.add(cfg)
 
-    current = _config_manager.load()
-    updates = update.model_dump(exclude_none=True)
+    update_data = update.model_dump(exclude_none=True)
+    if "provider" in update_data:
+        cfg.provider = update_data["provider"]
+    if "base_url" in update_data:
+        cfg.base_url = update_data["base_url"]
+    if "model_id" in update_data:
+        cfg.model_id = update_data["model_id"]
+    if "max_tokens" in update_data:
+        cfg.max_tokens = update_data["max_tokens"]
+    if "max_retries" in update_data:
+        cfg.max_retries = update_data["max_retries"]
+    if "timeout_seconds" in update_data:
+        cfg.timeout_seconds = update_data["timeout_seconds"]
 
-    # Replace whitelist_extra entirely (not append — prevents unbounded growth)
-
-    # Write merged config to project config file
-    project_cfg = _config_manager.project_root / ConfigManager.PROJECT_CONFIG_PATH
-    project_cfg.parent.mkdir(parents=True, exist_ok=True)
-
-    merged = current.model_copy(update=updates)
-
-    try:
-        import yaml  # type: ignore[import-untyped]
-    except ImportError:
-        raise HTTPException(status_code=500, detail="PyYAML is required for config writes")
-
-    with open(project_cfg, "w", encoding="utf-8") as fh:
-        yaml.dump(merged.model_dump(), fh, default_flow_style=False)
-
-    return {"status": "ok", "config": merged.model_dump()}
+    await db.flush()
+    return {"status": "ok"}
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+@router.post("/config/credentials")
+async def store_credential(
+    body: CredentialStore,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Store encrypted API key for current user."""
+    if _is_local() and _fallback_credential_manager:
+        _fallback_credential_manager.store("local", body.api_key)
+        return {"status": "ok"}
 
-def _mask_key(key: str) -> str:
-    if not key or len(key) < 8:
-        return "****"
-    return key[:3] + "..." + key[-4:]
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg is None:
+        cfg = UserConfig(user_id=user.id)
+        db.add(cfg)
+
+    encrypted = encrypt_credential(body.api_key)
+    cfg.api_key_enc = encrypted.hex()
+    await db.flush()
+    return {"status": "ok"}
+
+
+@router.delete("/config/credentials")
+async def delete_credential(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete stored API key for current user."""
+    if _is_local() and _fallback_credential_manager:
+        _fallback_credential_manager.delete("local")
+        return {"status": "ok"}
+
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg:
+        cfg.api_key_enc = None
+        await db.flush()
+    return {"status": "ok"}
+
+
+async def get_user_api_key(user: User, db: AsyncSession) -> str | None:
+    """Helper: fetch and decrypt user's API key (used by WebSocket handler)."""
+    if _is_local() and _fallback_credential_manager:
+        return _fallback_credential_manager.load("local")
+
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg is None or not cfg.api_key_enc:
+        return None
+    return decrypt_credential(bytes.fromhex(cfg.api_key_enc))
