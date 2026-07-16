@@ -1,10 +1,19 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import PageTransition from '../components/PageTransition';
+import ConceptCards from '../components/ConceptCards';
+import '../styles/learn.css';
 
 const LearnPage: React.FC = () => (
   <PageTransition>
-    <div style={{ padding: '80px 24px', maxWidth: 800, margin: '0 auto' }}>
-      <h1>Learn — Coming Soon</h1>
+    <div className="learn-page">
+      <motion.h1 className="learn-page__heading" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
+        🎓 学习入口
+      </motion.h1>
+      <motion.p className="learn-page__intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.15 }}>
+        深入理解 Agent 的魔法原理——从状态机到护栏，从反馈分析到多模型适配。
+      </motion.p>
+      <ConceptCards />
     </div>
   </PageTransition>
 );
