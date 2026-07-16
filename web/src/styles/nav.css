@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(254,250,245,0.85);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--color-border-base);
 }
@@ -36,7 +36,7 @@
 }
 
 .nav__logo-text {
-  background: var(--gradient-magic-primary);
+  background: var(--gradient-title);
   background-size: 200% 200%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -71,7 +71,7 @@
 }
 
 .nav__link--active {
-  color: var(--color-accent-primary);
+  color: var(--color-accent);
 }
 
 .nav__link--active::after {
@@ -82,9 +82,9 @@
   transform: translateX(-50%);
   width: 60%;
   height: 2px;
-  background: var(--gradient-magic-gold);
+  background: var(--color-accent);
   border-radius: var(--radius-full);
-  box-shadow: var(--glow-gold);
+  box-shadow: var(--shadow-glow);
 }
 
 .nav__link-icon {
@@ -114,8 +114,8 @@
 }
 
 .nav__github-btn:hover {
-  border-color: var(--color-accent-primary);
-  box-shadow: var(--glow-magic);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-glow);
 }
 
 .nav__github-count {
@@ -174,7 +174,7 @@
 }
 
 .nav__mobile-link:hover { background: var(--color-bg-element); }
-.nav__mobile-link--active { color: var(--color-accent-primary); background: var(--color-bg-element); }
+.nav__mobile-link--active { color: var(--color-accent); background: var(--color-bg-element); }
 
 @media (max-width: 900px) {
   .nav__links { display: none; }
