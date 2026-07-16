@@ -9,6 +9,7 @@ from server.ws_handler import router as ws_router, configure as configure_ws
 from server.api.config_routes import router as config_router, configure as configure_config
 from server.api.credential_routes import router as credential_router, configure as configure_credential
 from server.api.session_routes import router as session_router
+from server.api.auth_routes import router as auth_router
 
 from harness.config import ConfigManager
 from harness.credentials import CredentialManager
@@ -46,6 +47,7 @@ def create_app(project_root: Path | None = None) -> FastAPI:
     app.include_router(config_router, prefix="/api")
     app.include_router(credential_router, prefix="/api")
     app.include_router(session_router, prefix="/api")
+    app.include_router(auth_router, prefix="/api")
 
     # --- Serve frontend static files in production ---
     static_dir = Path(__file__).parent / "static"
