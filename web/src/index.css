@@ -1,38 +1,41 @@
-/* Design System: Linear (via Open Design)
-   https://github.com/nexu-io/open-design */
-
-/* =========================================================================
-   Design Tokens
-   ========================================================================= */
+/* Design System: Magic Dream Theme
+   Light, dreamy, fairy-tale aesthetic */
 
 :root {
-  /* ---- Colors (Semantic) ---- */
-  --color-bg-app: #0d1117;
-  --color-bg-surface: #161b22;
-  --color-bg-element: #1c2128;
-  --color-bg-elevated: #2a3038;
-  --color-bg-input: #0d1117;
+  --color-bg-primary: #faf5ff;
+  --color-bg-surface: #ffffff;
+  --color-bg-element: #f3e8ff;
+  --color-bg-elevated: #ede9fe;
+  --color-bg-input: #f8f0ff;
 
-  --color-text-primary: #e6edf3;
-  --color-text-secondary: #8b949e;
-  --color-text-tertiary: #6e7681;
+  --color-accent-primary: #8b5cf6;
+  --color-accent-hover: #7c3aed;
+  --color-accent-gold: #f59e0b;
+  --color-accent-gold-light: #fbbf24;
+  --color-accent-pink: #ec4899;
+  --color-accent-cyan: #06b6d4;
 
-  --color-border-base: #30363d;
-  --color-border-muted: #21262d;
+  --color-text-primary: #1e1b4b;
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
 
-  --color-accent-primary: #58a6ff;
-  --color-accent-hover: #79c0ff;
+  --color-status-success: #10b981;
+  --color-status-error: #ef4444;
+  --color-status-warning: #f59e0b;
 
-  --color-status-success: #3fb950;
-  --color-status-error: #f85149;
-  --color-status-warning: #d29922;
+  --color-border-base: #e5e0f0;
+  --color-border-muted: #f0ebf8;
 
-  /* Status backgrounds (alpha) */
-  --color-bg-success: rgba(63, 185, 80, 0.1);
-  --color-bg-error: rgba(248, 81, 73, 0.1);
-  --color-bg-warning: rgba(210, 153, 34, 0.1);
+  --gradient-hero: linear-gradient(180deg, #faf5ff 0%, #ede9fe 50%, #e0e7ff 100%);
+  --gradient-magic-primary: linear-gradient(135deg, #8b5cf6, #6d28d9, #3b82f6);
+  --gradient-magic-fairy: linear-gradient(135deg, #ec4899, #8b5cf6, #06b6d4);
+  --gradient-magic-text: linear-gradient(135deg, #8b5cf6, #ec4899, #f59e0b);
+  --gradient-magic-gold: linear-gradient(135deg, #f59e0b, #fbbf24);
 
-  /* ---- Spacing (4px scale) ---- */
+  --glow-magic: 0 0 20px rgba(139, 92, 246, 0.3), 0 0 40px rgba(139, 92, 246, 0.15);
+  --glow-gold: 0 0 20px rgba(245, 158, 11, 0.3), 0 0 40px rgba(245, 158, 11, 0.15);
+  --glow-card: 0 0 30px rgba(139, 92, 246, 0.1), 0 8px 32px rgba(139, 92, 246, 0.08);
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -42,12 +45,13 @@
   --space-7: 28px;
   --space-8: 32px;
 
-  /* ---- Typography ---- */
   --text-xs: 11px;
-  --text-sm: 12px;
-  --text-base: 14px;
-  --text-lg: 16px;
-  --text-xl: 18px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-hero: clamp(2.5rem, 6vw, 4.5rem);
 
   --font-regular: 400;
   --font-medium: 500;
@@ -58,24 +62,23 @@
   --leading-normal: 1.5;
   --leading-relaxed: 1.6;
 
-  /* ---- Radii ---- */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
 
-  /* ---- Shadows ---- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(139, 92, 246, 0.08);
+  --shadow-md: 0 4px 16px rgba(139, 92, 246, 0.1);
+  --shadow-lg: 0 12px 40px rgba(139, 92, 246, 0.12);
 
-  /* ---- Transitions ---- */
+  --magic-float-duration: 6s;
+  --magic-sparkle-duration: 2s;
+  --magic-transition: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  --magic-breathe: 3s ease-in-out infinite;
+
   --transition-fast: 150ms;
   --transition-normal: 250ms;
 }
-
-/* =========================================================================
-   Reset
-   ========================================================================= */
 
 *,
 *::before,
@@ -92,12 +95,12 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   color: var(--color-text-primary);
-  background: var(--color-bg-app);
+  background: var(--color-bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -105,10 +108,6 @@ body {
 #root {
   height: 100%;
 }
-
-/* =========================================================================
-   Scrollbar
-   ========================================================================= */
 
 ::-webkit-scrollbar {
   width: var(--space-2);
@@ -128,10 +127,6 @@ body {
   background: var(--color-text-tertiary);
 }
 
-/* =========================================================================
-   Focus visible
-   ========================================================================= */
-
 :focus-visible {
   outline: 2px solid var(--color-accent-primary);
   outline-offset: 2px;
@@ -140,10 +135,6 @@ body {
 button:focus:not(:focus-visible) {
   outline: none;
 }
-
-/* =========================================================================
-   Selection
-   ========================================================================= */
 
 ::selection {
   background: var(--color-accent-primary);
