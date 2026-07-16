@@ -34,6 +34,13 @@ class DockerManager:
         user_workspace = os.path.join(WORKSPACE_ROOT, user_id)
         os.makedirs(user_workspace, exist_ok=True)
 
+        # Remove existing container with same name (from previous connections)
+        try:
+            old = await asyncio.to_thread(self.client.containers.get, container_name)
+            await asyncio.to_thread(old.remove, force=True)
+        except Exception:
+            pass
+
         container = await asyncio.to_thread(
             self.client.containers.run,
             image=SANDBOX_IMAGE,
@@ -51,17 +58,20 @@ class DockerManager:
 
     async def exec(self, container_id: str, cmd: str, timeout: int = 600) -> ExecResult:
         """Execute a command inside the container and return result."""
-        async def _run():
+        def _run():
             container = self.client.containers.get(container_id)
             exit_code, output = container.exec_run(
                 ["sh", "-c", cmd],
                 stdout=True,
                 stderr=True,
+                demux=True,
             )
+            stdout_bytes = output[0] if output else None
+            stderr_bytes = output[1] if output else None
             return ExecResult(
                 exit_code=exit_code,
-                stdout=output[0].decode("utf-8", errors="replace") if output[0] else "",
-                stderr=output[1].decode("utf-8", errors="replace") if output[1] else "",
+                stdout=stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else "",
+                stderr=stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else "",
             )
 
         try:

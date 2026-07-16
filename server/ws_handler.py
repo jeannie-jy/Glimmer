@@ -50,8 +50,8 @@ def configure(
 
 def _build_default_tool_registry(docker_mgr=None, container_id=None) -> ToolRegistry:
     registry = ToolRegistry()
-    registry.register(ReadFileTool())
-    registry.register(WriteFileTool())
+    registry.register(ReadFileTool(docker_mgr=docker_mgr, container_id=container_id))
+    registry.register(WriteFileTool(docker_mgr=docker_mgr, container_id=container_id))
     registry.register(ExecuteShellTool(docker_mgr=docker_mgr, container_id=container_id))
     registry.register(RunTestsTool(docker_mgr=docker_mgr, container_id=container_id))
     registry.register(SearchCodeTool())
@@ -208,17 +208,48 @@ async def websocket_session(websocket: WebSocket) -> None:
     config_manager: ConfigManager | None = getattr(app_state, 'ws_config_manager', None)
     credential_manager: CredentialManager | None = getattr(app_state, 'ws_credential_manager', None)
 
-    # ---- Wait for first message (task.submit or session.load) ----
-    try:
-        raw = await websocket.receive_json()
-    except WebSocketDisconnect:
-        return
+    # ---- Declare outer scope variables for later initialization ----
+    docker_mgr = None
+    container_id = None
+    user_id = user_id_from_jwt or "local"
+    harness_session: PydanticSession | None = None
 
-    msg_type = raw.get("type", "")
-    if msg_type not in ("task.submit", "session.load"):
-        await websocket.send_json({"type": "session.error", "message": "Expected task.submit or session.load"})
-        await websocket.close()
-        return
+    # ---- Create Docker container eagerly (before first message) ----
+    async def _create_docker_container() -> str | None:
+        if LOCAL_MODE: return None
+        nonlocal docker_mgr
+        if docker_mgr is None: docker_mgr = DockerManager()
+        return await docker_mgr.create(user_id, f"user-{user_id[:12]}")
+
+    async def _destroy_docker_container():
+        nonlocal docker_mgr, container_id
+        if harness_session is not None: unregister_session(harness_session.id)
+        if not LOCAL_MODE and docker_mgr is not None and container_id is not None:
+            try: await docker_mgr.destroy(container_id)
+            except Exception: pass
+            container_id = None
+
+    container_id = await _create_docker_container()
+    if not LOCAL_MODE and container_id:
+        register_session("pending", docker_mgr, container_id, user_id)
+
+    # ---- Wait for first message (task.submit or session.load) ----
+    # Loop until we get a valid first message; handle files.list immediately,
+    # defer files.upload/filedownload/etc. for replay after bootstrap.
+    msg_type = ""
+    raw = {}
+    deferred: list[dict] = []
+    while msg_type not in ("task.submit", "session.load"):
+        try:
+            raw = await websocket.receive_json()
+            msg_type = raw.get("type", "")
+            if msg_type not in ("task.submit", "session.load"):
+                if msg_type == "files.list":
+                    await _send_file_list(websocket, docker_mgr, container_id, LOCAL_MODE)
+                elif msg_type in ("files.upload", "files.download", "files.delete"):
+                    deferred.append(raw)
+        except WebSocketDisconnect:
+            return
 
     # ---- Resolve config & credentials ----
     if LOCAL_MODE:
@@ -229,8 +260,6 @@ async def websocket_session(websocket: WebSocket) -> None:
             credential_manager = CredentialManager(project_root)
         config: ConfigData = config_manager.load()
         api_key: str | None = credential_manager.load(config.model_provider)
-        docker_mgr = None
-        container_id = None
         user_id = "local"
     else:
         async for db_session in get_db():
@@ -462,6 +491,31 @@ async def websocket_session(websocket: WebSocket) -> None:
             await emit_to_ws("session.created", session_id=harness_session.id)
 
     # ---- Main message loop ----
+    # Replay deferred messages collected during bootstrap wait
+    for d in deferred:
+        t = d.get("type", "")
+        print(f"[WS] Replaying deferred: {t}")
+        if t == "files.list":
+            await _send_file_list(websocket, docker_mgr, container_id, LOCAL_MODE)
+        elif t == "files.upload":
+            # Re-upload: same logic as main loop handler
+            fp = d.get("path", ""); fb64 = d.get("content", "")
+            if fp and fb64 and not LOCAL_MODE and docker_mgr is not None and container_id is not None:
+                try:
+                    import shlex as _sh, base64 as _b64
+                    clean = fp.lstrip("/")
+                    if clean.startswith("workspace/"): clean = clean[len("workspace/"):]
+                    safe = os.path.normpath(os.path.join("/workspace", clean))
+                    if safe.startswith("/workspace/"):
+                        parent = str(__import__('pathlib').Path(safe).parent)
+                        await docker_mgr.exec(container_id, f"mkdir -p {_sh.quote(parent)}", timeout=5)
+                        r = await docker_mgr.exec(container_id, f"echo {_sh.quote(fb64)} | base64 -d > {_sh.quote(safe)}", timeout=15)
+                        if r.exit_code == 0:
+                            _known_files.add(fp)
+                            await emit_to_ws("file.created", path=fp)
+                except Exception as e:
+                    print(f"[WS] Deferred upload failed: {e}")
+
     try:
         while True:
             try:

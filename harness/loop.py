@@ -80,9 +80,17 @@ class AgentLoop:
         tool_desc = "\n".join(f"- {t.name}: {t.description}" for t in tool_defs)
 
         session.messages.append(Message(role="system", content=(
-            "You are a coding agent. You help developers write, fix, and improve code.\n"
-            "Available tools:\n" + tool_desc + "\n"
-            "When you complete a task, explain what you did clearly."
+            "You are a coding agent with access to a real file system and shell. "
+            "You help developers write, fix, and improve code.\n\n"
+            "CRITICAL RULES:\n"
+            "1. When the user asks you to analyze, inspect, explain, or work with ANY file, "
+            "you MUST call the read_file tool FIRST to read its actual contents. "
+            "Never guess, assume, or fabricate file contents.\n"
+            "2. When searching for code, always use search_code before claiming something doesn't exist.\n"
+            "3. Use write_file to create or modify files — all changes are real and persistent.\n"
+            "4. Use execute_shell for running commands, builds, and tests.\n"
+            "5. After completing tool operations, explain clearly what you did and why.\n\n"
+            "Available tools:\n" + tool_desc
         )))
         session.messages.append(Message(role="user", content=task))
         session.state = transition(State.IDLE, EventType.TASK_SUBMIT)

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { WsServerMessage } from '../hooks/useWebSocket';
 import type { AgentState } from '../hooks/useSession';
+import type { Attachment } from './InputBar';
 import MessageList from './MessageList';
 import InputBar from './InputBar';
 import StateIndicator from './StateIndicator';
@@ -10,13 +11,15 @@ interface ChatViewProps {
   messages: WsServerMessage[];
   state: AgentState;
   task: string;
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: Attachment[]) => void;
   onStop: () => void;
   onNewSession: () => void;
+  userTasks?: Array<{text: string; files?: Array<{name: string; size: number}>}>;
   historyItems?: Array<{ id: number; type: string; data: unknown }>;
+  focusKey?: number;
 }
 
-const ChatView: React.FC<ChatViewProps> = ({ messages, state, task, onSend, onStop, onNewSession, historyItems }) => {
+const ChatView: React.FC<ChatViewProps> = ({ messages, state, task, onSend, onStop, onNewSession, userTasks, historyItems, focusKey }) => {
   const isRunning = ['planning', 'executing', 'observing', 'correcting'].includes(state);
   const isAwaiting = state === 'awaiting_human';
   const disabled = isRunning || isAwaiting;
@@ -37,12 +40,13 @@ const ChatView: React.FC<ChatViewProps> = ({ messages, state, task, onSend, onSt
           </button>
         </div>
       </div>
-      <MessageList messages={messages} task={task} agentState={state} historyItems={historyItems} />
+      <MessageList messages={messages} task={task} agentState={state} userTasks={userTasks} historyItems={historyItems} />
       <InputBar
         onSend={onSend}
         onStop={onStop}
         disabled={disabled}
         isRunning={isRunning}
+        focusKey={focusKey}
         placeholder={
           isAwaiting
             ? 'Awaiting human approval...'

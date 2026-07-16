@@ -2,7 +2,7 @@
 import os
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 
 from harness.db.database import get_db
@@ -24,7 +24,7 @@ async def list_sessions(
     result = await db.execute(
         select(Session)
         .where(Session.user_id == user.id)
-        .order_by(Session.created_at.desc())
+        .order_by(desc(func.coalesce(Session.finished_at, Session.created_at)))
         .limit(50)
     )
     sessions = result.scalars().all()
@@ -36,6 +36,7 @@ async def list_sessions(
                 "state": s.status,
                 "status": s.status,
                 "created_at": s.created_at.isoformat() if s.created_at else "",
+                "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             }
             for s in sessions
         ]

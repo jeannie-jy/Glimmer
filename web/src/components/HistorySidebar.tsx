@@ -12,6 +12,7 @@ interface HistorySession {
   state: string;
   status: string;
   created_at: string;
+  finished_at?: string | null;
 }
 
 interface HistorySidebarProps {
@@ -102,7 +103,7 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
               <span className="history-sidebar__task">{s.task || 'Untitled session'}</span>
               <span className="history-sidebar__meta">
                 <span className="history-sidebar__state">{s.status || s.state || 'unknown'}</span>
-                <span className="history-sidebar__time">{formatDate(s.created_at)}</span>
+                <span className="history-sidebar__time">{formatDate(s.finished_at || s.created_at)}</span>
               </span>
             </li>
           ))}
