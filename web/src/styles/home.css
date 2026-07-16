@@ -23,31 +23,40 @@
   max-width: 720px;
 }
 
-.hero__title {
-  font-size: var(--text-hero);
-  font-weight: var(--font-bold);
-  line-height: 1.1;
+.hero__fairy-orbit {
+  position: relative;
+  width: 100%;
+  height: 60px;
   margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero__title {
+  font-family: var(--font-display);
+  font-size: var(--text-hero);
+  font-weight: 400;
+  line-height: 1.2;
+  margin-bottom: var(--space-2);
+  text-shadow: 0 2px 20px rgba(248, 164, 200, 0.3);
 }
 
 .hero__subtitle {
-  font-size: var(--text-xl);
+  font-family: var(--font-display);
+  font-size: var(--text-tagline-en);
+  font-weight: 400;
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-3);
-  font-weight: var(--font-medium);
+  margin-bottom: var(--space-2);
 }
 
 .hero__tagline {
-  font-size: var(--text-lg);
-  color: var(--color-accent-primary);
-  margin-bottom: var(--space-3);
-  font-weight: var(--font-medium);
-}
-
-.hero__desc {
-  font-size: var(--text-base);
+  font-family: var(--font-tagline);
+  font-size: var(--text-tagline-zh);
+  font-weight: 400;
+  font-style: italic;
   color: var(--color-text-tertiary);
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-6);
 }
 
 .hero__actions {
@@ -73,29 +82,14 @@
 }
 
 .hero__btn--primary {
-  background: var(--gradient-magic-primary);
+  background: var(--color-accent);
   color: #fff;
-  box-shadow: var(--glow-magic);
+  box-shadow: 0 0 16px rgba(248,164,200,0.3);
 }
 
 .hero__btn--primary:hover {
-  box-shadow: 0 0 30px rgba(139, 92, 246, 0.5), 0 0 60px rgba(139, 92, 246, 0.25);
-}
-
-.hero__btn--primary::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: var(--radius-full);
-  background: var(--gradient-magic-fairy);
-  z-index: -1;
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-}
-
-.hero__btn--primary:hover::after {
-  opacity: 1;
-  animation: magic-circle 3s linear infinite;
+  background: var(--color-accent-hover);
+  box-shadow: 0 0 24px rgba(248,164,200,0.5);
 }
 
 .hero__btn--secondary {
@@ -116,14 +110,24 @@
 .hero__scroll-hint {
   position: absolute;
   bottom: var(--space-6);
-  font-size: var(--text-xl);
   color: var(--color-text-tertiary);
   z-index: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.hero__scroll-hint:hover {
+  color: var(--color-accent-primary);
 }
 
 .fairy-sprite {
-  margin-bottom: var(--space-4);
   display: inline-block;
+}
+
+.wand-tip {
+  animation: sparkle-blink 2s ease-in-out infinite;
 }
 
 .card-grid {

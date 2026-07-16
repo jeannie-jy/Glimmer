@@ -1,27 +1,26 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Sparkles, BookOpen, ChevronDown } from 'lucide-react';
 import FairySprite from './FairySprite';
-import { Sparkles, BookOpen } from 'lucide-react';
 
 const HeroSection: React.FC = () => {
   const navigate = useNavigate();
-
-  const scrollToCards = () => {
-    document.getElementById('magic-cards')?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToCards = () => document.getElementById('magic-cards')?.scrollIntoView({ behavior: 'smooth' });
 
   return (
     <section className="hero">
       <div className="hero__bg" />
       <div className="hero__content">
-        <FairySprite />
+        <div className="hero__fairy-orbit">
+          <FairySprite />
+        </div>
 
         <motion.h1
           className="hero__title gradient-text"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
         >
           Lite Agent Harness
         </motion.h1>
@@ -30,7 +29,7 @@ const HeroSection: React.FC = () => {
           className="hero__subtitle"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
           Where Code Becomes Magic
         </motion.p>
@@ -39,18 +38,9 @@ const HeroSection: React.FC = () => {
           className="hero__tagline"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 1, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
         >
-          将每一次代码生成，化作魔法咒语
-        </motion.p>
-
-        <motion.p
-          className="hero__desc"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-        >
-          轻量、模型无关的 AI 编程助手框架
+          每一次编码，都是一场施法
         </motion.p>
 
         <motion.div
@@ -60,21 +50,24 @@ const HeroSection: React.FC = () => {
           transition={{ duration: 0.8, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <button className="hero__btn hero__btn--primary" onClick={() => navigate('/agent')}>
-            <span className="hero__btn-icon"><Sparkles size={20} /></span> 开始施法
+            <Sparkles size={18} /> 开始施法
           </button>
           <button className="hero__btn hero__btn--secondary" onClick={scrollToCards}>
-            <span className="hero__btn-icon"><BookOpen size={20} /></span> 了解更多
+            <BookOpen size={18} /> 了解更多
           </button>
         </motion.div>
       </div>
 
-      <motion.div
+      <motion.button
         className="hero__scroll-hint"
+        onClick={scrollToCards}
         animate={{ y: [0, 8, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
+        aria-label="Scroll to learn more"
+        type="button"
       >
-        ↓
-      </motion.div>
+        <ChevronDown size={24} />
+      </motion.button>
     </section>
   );
 };
