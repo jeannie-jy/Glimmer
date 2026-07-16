@@ -1,4 +1,4 @@
-# Lite Agent Harness 实现计划
+# Glimmer 实现计划
 
 > **对智能体工作者的提示：** 必需子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 来按任务逐步实现该计划。步骤使用复选框（`- [ ]`）语法进行跟踪。
 
@@ -25,7 +25,7 @@
 ## 文件结构
 
 ```
-lite-agent-harness/
+glimmer/
 ├── harness/                      # 框架内核
 │   ├── __init__.py
 │   ├── models.py                 # 共享数据模型
@@ -183,7 +183,7 @@ build-web:
 	cd web && npm install && npm run build
 
 build-docker:
-	docker build -t lite-agent-harness .
+	docker build -t glimmer .
 
 build-binary:
 	pyinstaller pyinstaller.spec
@@ -269,7 +269,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - [ ] **步骤 2：创建 harness/__init__.py**
 
 ```python
-"""Lite Agent Harness - 一个轻量级、模型无关的编码智能体框架。"""
+"""Glimmer - 一个轻量级、模型无关的编码智能体框架。"""
 ```
 
 - [ ] **步骤 3：创建 harness/models.py**
@@ -2670,7 +2670,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 `ConfigManager`：加载 `.harness/config.yaml` 和 `~/.harness/config.yaml`，使用字典优先级深度合并（项目 > 全局 > 默认），返回 `ConfigData` Pydantic 模型。
 
-`CredentialManager`：首先尝试 `keyring.get_password("lite-agent-harness", provider)`；如果出现 `keyring.errors.KeyringError`，回退到 AES-GCM 加密文件，存储在 `.harness/credentials/{provider}.enc`，使用 `HARNESS_KEY_PASSWORD` 环境变量解密。`mask()` 显示前 3 个和后 4 个字符。`status()` 返回 "configured (sk-...ab12)" 或 "not configured"。
+`CredentialManager`：首先尝试 `keyring.get_password("glimmer", provider)`；如果出现 `keyring.errors.KeyringError`，回退到 AES-GCM 加密文件，存储在 `.harness/credentials/{provider}.enc`，使用 `HARNESS_KEY_PASSWORD` 环境变量解密。`mask()` 显示前 3 个和后 4 个字符。`status()` 返回 "configured (sk-...ab12)" 或 "not configured"。
 
 - [ ] **步骤 3：运行测试并提交**
 
@@ -2702,7 +2702,7 @@ from server.api.config_routes import router as config_router
 from server.api.credential_routes import router as credential_router
 from server.api.session_routes import router as session_router
 
-app = FastAPI(title="Lite Agent Harness", version="0.1.0")
+app = FastAPI(title="Glimmer", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
 
 app.include_router(ws_router)

@@ -1,34 +1,43 @@
-[English](README.md) | [中文](README.zh.md)
-
----
-
 # Glimmer
 
-A lightweight, model-agnostic coding agent harness with deterministic guardrails and mock-driven testing.
+A lightweight, model-agnostic AI coding agent with deterministic guardrails, Docker sandbox isolation, and a fairy-tale themed web UI.
 
-Built from scratch as a final project for the AI4SE course, this harness demonstrates a complete agent loop with state-machine-driven execution, multi-provider LLM support, a three-layer guardrail system, deterministic feedback analysis with multi-round self-correction, and a real-time web UI.
+> "每一次编码，都是一场施法" — SpellCraft your code with Glimmer.
 
 ---
 
 ## Features
 
-- **State-machine-driven agent loop** -- deterministic transitions via a pure-function state machine (IDLE -> PLANNING -> EXECUTING -> OBSERVING -> CORRECTING -> COMPLETED). No LLM is involved in routing decisions.
-- **Multi-provider LLM support** -- pluggable adapters for Anthropic (Messages API) and OpenAI (Chat Completions API), plus a Mock adapter for zero-network testing.
-- **Three-layer guardrail system** -- Layer 1: filesystem path sandbox. Layer 2: command whitelist. Layer 3: regex-based dangerous pattern blacklist. Each layer can ALLOW, BLOCK, or ASK_HUMAN.
-- **Deterministic feedback analyzer** -- exit-code and structured test-report analysis, not prompt-based. Works identically with or without an LLM. Multi-round self-correction via a retry policy that detects stuck loops.
-- **Web UI with real-time streaming** -- React + TypeScript frontend (Open Design / Linear design system, see `DESIGN.md`), FastAPI + WebSocket backend. Streaming token display, tool call cards, guardrail prompts, feedback banners, and a settings panel.
-- **Docker + PyInstaller dual distribution** -- run in a container or as a standalone executable.
-- **Secure credential storage** -- OS keyring (desktop) with AES-GCM encrypted file fallback (Docker). Keys never appear in logs, git history, or plaintext config.
+- **State-machine-driven agent loop** — deterministic transitions via a pure-function state machine (IDLE → PLANNING → EXECUTING → OBSERVING → CORRECTING → COMPLETED). No LLM involved in routing decisions.
+- **Multi-provider LLM support** — Anthropic (Messages API) + OpenAI-compatible (DeepSeek, Qwen, Ollama, vLLM, etc.). Configurable base URL, model name, and API key per user.
+- **Multi-user ready** — GitHub OAuth authentication, JWT middleware, per-user isolated configs with AES-256-GCM encrypted API keys, PostgreSQL persistence.
+- **Docker sandbox** — Each agent session runs in an isolated container (`--network none`, 512MB memory limit, 1 CPU). Safe code execution for multi-tenant environments.
+- **Three-layer guardrail system** — Layer 1: filesystem path sandbox. Layer 2: command whitelist. Layer 3: regex-based dangerous pattern blacklist. Each layer can ALLOW, BLOCK, or ASK_HUMAN.
+- **Deterministic feedback analyzer** — exit-code and structured test-report analysis, not prompt-based. Multi-round self-correction with stuck-loop detection.
+- **Fairy-tale Web UI** — React + TypeScript frontend with pink-white dream theme, Great Vibes calligraphic titles, framer-motion animations, Canvas glitter particles, fairy orbit, and live demo chat. Multi-page architecture: Home, About, Guide, Learn, Agent.
+- **Real-time streaming** — WebSocket-based streaming token display, tool call cards, guardrail prompts, feedback banners, and settings panel.
+- **Docker + docker-compose deployment** — production-ready with Nginx reverse proxy, SSL-ready, rate limiting (slowapi).
 
 ---
 
 ## Quick Start
 
+### Local single-user mode
+
 ```bash
 pip install -r requirements.txt
-cp .harness/config.yaml .harness/config.yaml   # already present; edit provider/model
-make run
+uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
 # Open http://localhost:8000
+```
+
+### Multi-user mode (requires PostgreSQL + Docker)
+
+```bash
+export GITHUB_CLIENT_ID=your_github_oauth_client_id
+export GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
+export GLIMMER_SECRET_KEY=$(openssl rand -hex 32)
+export DB_PASSWORD=your_db_password
+docker-compose up -d
 ```
 
 ---
@@ -36,325 +45,154 @@ make run
 ## Project Structure
 
 ```
-lite-agent-harness/
-├── docs/                          # Course requirements & design specs
+glimmer/
 ├── harness/                       # Core library
-│   ├── config/                    #   YAML config loading & merging
+│   ├── auth/                      #   Authentication
+│   │   ├── jwt.py                 #     JWT creation & verification
+│   │   ├── oauth.py               #     GitHub OAuth flow
+│   │   └── crypto.py              #     AES-256-GCM credential encryption
+│   ├── config/                    #   YAML config loading (local mode)
 │   │   └── manager.py
-│   ├── credentials/               #   Secure API key storage
+│   ├── credentials/               #   API key storage (local mode)
 │   │   └── manager.py
+│   ├── db/                        #   PostgreSQL models & session
+│   │   ├── database.py            #     Async connection pool
+│   │   ├── models.py              #     User, UserConfig, Session, Message
+│   │   └── migrations/            #     Alembic migrations
 │   ├── feedback/                  #   Deterministic feedback analysis
-│   │   ├── analyzer.py            #     Verdict dispatch by tool type
-│   │   ├── pytest_parser.py       #     Pytest JSON report parser
-│   │   └── retry_policy.py        #     Retry limits & stuck detection
+│   │   ├── analyzer.py
+│   │   ├── pytest_parser.py
+│   │   └── retry_policy.py
 │   ├── guardrails/                #   Three-layer safety system
-│   │   ├── engine.py              #     Orchestrator
-│   │   ├── path_sandbox.py        #     Layer 1: filesystem boundary
-│   │   ├── whitelist.py           #     Layer 2: command allow list
-│   │   └── patterns.py            #     Layer 3: regex blacklist
+│   │   ├── engine.py
+│   │   ├── path_sandbox.py
+│   │   ├── whitelist.py
+│   │   └── patterns.py
 │   ├── llm/                       #   Multi-provider LLM abstraction
 │   │   ├── adapter.py             #     ABC for all providers
 │   │   ├── anthropic.py           #     Anthropic Messages API
-│   │   ├── mock.py                #     Pre-programmed responses for tests
-│   │   └── openai.py              #     OpenAI Chat Completions API
+│   │   ├── mock.py                #     Pre-programmed responses (tests)
+│   │   └── openai.py              #     OpenAI-compatible (DeepSeek, Qwen, etc.)
 │   ├── memory/                    #   Decision & learning persistence
 │   │   └── manager.py
+│   ├── sandbox/                   #   Docker container management
+│   │   └── docker_manager.py      #     Create/exec/destroy per session
 │   ├── tools/                     #   Agent tool definitions
-│   │   ├── registry.py            #     Registration & dispatch
-│   │   ├── code_search.py         #     ripgrep / Python grep
-│   │   ├── file_ops.py            #     read_file / write_file
-│   │   └── shell.py               #     execute_shell / run_tests
+│   │   ├── registry.py
+│   │   ├── code_search.py
+│   │   ├── file_ops.py
+│   │   └── shell.py
 │   ├── __init__.py
 │   ├── loop.py                    #   Main agent event loop
-│   ├── models.py                  #   Shared pydantic data models
+│   ├── models.py                  #   Shared Pydantic data models
 │   └── state_machine.py           #   Deterministic state transition table
 ├── server/                        # FastAPI web server
 │   ├── api/                       #   REST routes
-│   │   ├── config_routes.py       #     GET/PUT /api/config
-│   │   ├── credential_routes.py   #     GET/POST/DELETE /api/credentials
-│   │   └── session_routes.py      #     GET /api/session/history
+│   │   ├── auth_routes.py         #     GitHub OAuth (login, callback, me)
+│   │   ├── config_routes.py       #     Per-user config + credentials
+│   │   └── session_routes.py      #     Session history CRUD
 │   ├── static/                    #   Built frontend assets
 │   ├── __init__.py
 │   ├── main.py                    #   FastAPI app factory
-│   └── ws_handler.py              #   WebSocket session handler
-├── tests/                         # Test suite
-│   ├── demo/                      #   Runnable demonstrations
-│   │   ├── demo_guardrail.py
-│   │   ├── demo_feedback_loop.py
-│   │   └── demo_sandbox.py
-│   ├── integration/               #   Integration tests (12 tests)
-│   │   ├── test_agent_loop.py
-│   │   └── test_websocket.py
-│   ├── unit/                      #   Unit tests (82 tests)
-│   │   ├── test_config_merge.py
-│   │   ├── test_credential_mask.py
-│   │   ├── test_feedback_analyzer.py
-│   │   ├── test_feedback_retry.py
-│   │   ├── test_guardrail_patterns.py
-│   │   ├── test_guardrail_sandbox.py
-│   │   ├── test_llm_mock.py
-│   │   ├── test_memory_manager.py
-│   │   ├── test_state_machine.py
-│   │   └── test_tool_registry.py
-│   ├── __init__.py
-│   └── conftest.py                # Shared fixtures
+│   └── ws_handler.py              #   WebSocket session handler (JWT auth)
 ├── web/                           # React + TypeScript frontend
 │   ├── src/
-│   │   ├── components/            #   UI components
-│   │   ├── hooks/                 #   React hooks (WebSocket, session)
+│   │   ├── components/            #   UI components (20 files)
+│   │   ├── contexts/              #   AuthContext (JWT state)
+│   │   ├── hooks/                 #   useWebSocket, useSession, useGitHubStars
+│   │   ├── pages/                 #   Home, About, Guide, Learn, Agent, Login
 │   │   ├── services/              #   API client
-│   │   └── ...
+│   │   └── styles/                #   CSS (magic tokens, animations, page styles)
 │   ├── index.html
 │   ├── package.json
-│   ├── tsconfig.json
 │   └── vite.config.ts
+├── tests/                         # Test suite (94+ tests)
+├── docs/                          # Design specs & implementation plans
+├── DESIGN.md                      # Fairy-Tale Dream design system reference
+├── Dockerfile                     # Multi-stage build (Node + Python)
+├── Dockerfile.sandbox             # Agent sandbox image
+├── docker-compose.yml             # Production deployment (nginx + api + db)
+├── nginx.conf                     # Reverse proxy config
+├── pyinstaller.spec               # PyInstaller standalone binary
+├── requirements.txt               # Python dependencies
 ├── .harness/
-│   └── config.yaml                # Project-level harness configuration
-├── DESIGN.md                       # Open Design / Linear design tokens
-├── Dockerfile                     # Docker multi-stage build
+│   └── config.yaml                # Local-mode configuration
 ├── LICENSE                        # MIT
-├── Makefile                       # Build, test, run targets
-├── pyinstaller.spec               # PyInstaller spec for standalone binary
-├── pytest.ini                     # Pytest configuration
-└── requirements.txt               # Python dependencies
-```
-
----
-
-## Installation
-
-### Prerequisites
-
-- **Python 3.12+** (developed on 3.14)
-- **Node.js 22+** (for frontend development; pre-built static files are included)
-- **ripgrep** (optional, but recommended for fast code search; falls back to Python `re`)
-
-### Python Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-Key packages: `pydantic`, `pyyaml`, `anthropic`, `openai`, `fastapi`, `uvicorn`, `keyring`, `cryptography`, `pytest`, `httpx`.
-
-### Frontend Build (optional -- pre-built static files are in `server/static/`)
-
-```bash
-cd web
-npm install
-npm run build
-# Output goes to server/static/
-```
-
----
-
-## Running
-
-| Command | Description |
-|---|---|
-| `make run` | Start the development server (uvicorn with hot-reload on `localhost:8000`) |
-| `make test` | Run all unit + integration tests |
-| `make test-unit` | Run only unit tests (82 tests, zero network) |
-| `make test-integration` | Run only integration tests (12 tests) |
-| `make build-web` | Build the React frontend |
-| `make build-docker` | Build the Docker image |
-| `make build-binary` | Build a standalone executable via PyInstaller |
-| `make clean` | Remove build artifacts |
-
-### Development Server
-
-```bash
-make run
-# or directly:
-uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-Then open `http://localhost:8000` in your browser. The WebSocket handler starts when you submit a task through the UI.
-
-### Standalone Binary
-
-```bash
-make build-binary
-# ./dist/lite-agent-harness  (or lite-agent-harness.exe on Windows)
+└── Makefile                       # Build commands
 ```
 
 ---
 
 ## Configuration
 
-Configuration is managed by `ConfigManager` which merges three layers (highest priority first):
+### Settings Panel (Web UI)
 
-1. **Project config**: `.harness/config.yaml`
-2. **Global config**: `~/.harness/config.yaml`
-3. **Built-in defaults**: `ConfigData()` model defaults
+| Field | Description |
+|-------|-------------|
+| **Provider** | `Anthropic` or `OpenAI Compatible` |
+| **Base URL** | OpenAI-compatible endpoint (e.g. `https://api.deepseek.com`) |
+| **Model Name** | Model ID (e.g. `claude-sonnet-5`, `deepseek-chat`, `qwen-plus`) |
+| **API Key** | Your API key (encrypted at rest) |
 
-### `.harness/config.yaml` Sections
+One-click Save stores both config and API key.
 
-```yaml
-model:
-  provider: anthropic        # "anthropic", "openai", or unsupported -> Mock
-  model_id: claude-sonnet-5  # e.g., "gpt-4o", "claude-sonnet-5-20251001"
-  max_tokens: 4096
+### Environment Variables (multi-user deployment)
 
-guardrails:
-  max_retries: 3             # Maximum self-correction attempts
-  sandbox_root: .            # Restrict file access to this directory
-  command_whitelist_extra: [] # Additional allowed commands
-  timeout_seconds: 30        # Shell command timeout
-
-tools:
-  enabled: [read_file, write_file, execute_shell, run_tests, search_code]
-
-memory:
-  max_context_tokens: 8000
-  learnings_limit: 20
-```
-
-The REST API at `GET /api/config` returns the merged configuration. `PUT /api/config` updates the project-level file.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GLIMMER_SECRET_KEY` | Yes | Master key for JWT signing + credential encryption |
+| `GITHUB_CLIENT_ID` | Yes | GitHub OAuth App client ID |
+| `GITHUB_CLIENT_SECRET` | Yes | GitHub OAuth App client secret |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `OAUTH_REDIRECT_URI` | No | OAuth callback URL (default: `http://localhost:8000/api/auth/callback`) |
+| `DOCKER_HOST` | No | Docker daemon socket |
+| `SANDBOX_IMAGE` | No | Sandbox image (default: `glimmer-sandbox:latest`) |
+| `WORKSPACE_ROOT` | No | User workspace root (default: `/workspace`) |
 
 ---
 
-## Credential Management
+## Supported LLM Providers
 
-### Setting API Keys
+| Provider | Base URL | Example Model |
+|----------|----------|---------------|
+| **Anthropic** | (built-in) | `claude-sonnet-5` |
+| **OpenAI** | (built-in) | `gpt-4o` |
+| **DeepSeek** | `https://api.deepseek.com` | `deepseek-chat` |
+| **Qwen (通义千问)** | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
+| **Ollama** | `http://localhost:11434/v1` | `llama3` |
+| **vLLM** | (custom) | any |
 
-**Via Web UI**: Open the Settings panel and enter your API key for the selected provider (Anthropic or OpenAI).
-
-**Via environment variable** (for headless / Docker use): The LLM adapters read the relevant key directly from the environment if provided.
-
-### Storage
-
-- **Desktop (keyring available)**: Keys are stored in the OS keychain (`keyring` library).
-- **Docker / headless (keyring unavailable)**: Keys are encrypted with AES-GCM and stored at `.harness/credentials/{provider}.enc`. The encryption key is derived via HKDF from the `HARNESS_KEY_PASSWORD` environment variable.
-
-### Security
-
-- Keys are **never** logged, written to git, or stored in plaintext config files.
-- The `mask()` method returns a safe display string: `sk-...ab12`.
-- The credentials REST API never returns full keys.
-- Threat model: local single-user tool. OS keyring protection prevents casual theft; AES-GCM fallback prevents plaintext exposure in Docker volumes.
-
----
-
-## Distribution
-
-### Docker
-
-```bash
-make build-docker
-# or manually:
-docker build -t lite-agent-harness .
-docker run -p 8000:8000 -e HARNESS_KEY_PASSWORD=<your-password> lite-agent-harness
-```
-
-Multi-stage build: Node 22-alpine builds the frontend, Python 3.12-slim runs the server. Listens on `0.0.0.0:8000`.
-
-### PyInstaller Binary
-
-```bash
-make build-binary
-# Output: dist/lite-agent-harness (or .exe on Windows)
-```
-
-**Known limitations:**
-- Windows SmartScreen may warn on unsigned binaries.
-- ripgrep is recommended for `search_code` speed; falls back to Python regex if unavailable.
-- The binary is a single-file executable with embedded data directories.
+Any OpenAI-compatible API works — just enter the Base URL.
 
 ---
 
 ## Testing
 
-### Test Suite
-
-| Suite | Count | Scope |
-|---|---|---|
-| Unit tests | 82 | All components in isolation, zero network, mock LLM |
-| Integration tests | 12 | Full agent loop, WebSocket, REST API via TestClient |
-| **Total** | **94** | |
-
 ```bash
-# Full suite
+# Full suite (94+ tests)
 make test
 
-# Individual suites
+# Unit tests only (82 tests, zero network)
 make test-unit
+
+# Integration tests (12 tests)
 make test-integration
 
-# Specific test file
-python -m pytest tests/unit/test_state_machine.py -v
+# Runnable demos
+python tests/demo/demo_guardrail.py
+python tests/demo/demo_sandbox.py
+python tests/demo/demo_feedback_loop.py
 ```
-
-### Runnable Demos
-
-```bash
-python tests/demo/demo_guardrail.py       # Guardrail intercepts rm -rf /
-python tests/demo/demo_sandbox.py         # Path sandbox + command whitelist
-python tests/demo/demo_feedback_loop.py   # Agent failure -> correction -> completion
-```
-
-### Testing Philosophy
-
-- **Zero network in unit tests**: All tests use `MockLLMAdapter` with pre-programmed responses.
-- **Deterministic state machine**: `transition()` is a pure function tested without any LLM.
-- **Feedback analyzer is code, not prompts**: Verdicts come from exit codes and structured JSON, never from LLM judgment.
-- **Guardrails are tested in isolation**: Each layer (path, whitelist, pattern) has its own test file.
 
 ---
 
-## Agent Architecture
+## Design System
 
-### State Machine
-
-```
-     TASK_SUBMIT
-  IDLE ---------> PLANNING
-                    |  |
-           LLM_FINISH | LLM_TOOL_USE
-              |       |
-           COMPLETED  v
-                   EXECUTING
-                  /    |     \
-          GUARD_ALLOW | GUARD_BLOCK / GUARD_ASK_HUMAN
-             |        |          |
-         OBSERVING    +--> AWAITING_HUMAN
-          / | \                 |
- FEEDBACK_FAIL  | FEEDBACK_PASS | HUMAN_APPROVE / HUMAN_REJECT
-     |          |                |
-CORRECTING      +<---------------+
-     |
-RETRY / MAX_RETRIES --> PLANNING or COMPLETED
-```
-
-Transitions are computed by the pure function `transition(state, event) -> state` in `harness/state_machine.py`. No LLM call is involved in routing -- this guarantees deterministic behavior for testing.
-
-### Three-Layer Guardrails
-
-| Layer | Component | Action | Scope |
-|---|---|---|---|
-| 1 | `PathSandbox` | BLOCK | File reads/writes outside the sandbox root |
-| 2 | `CommandWhitelist` | ASK_HUMAN | Shell commands not in the allowed list |
-| 3 | `PatternBlacklist` | BLOCK or ASK_HUMAN | Dangerous patterns (`rm -rf /`, `DROP TABLE`, force push, curl pipe bash, etc.) |
-
-### Feedback & Self-Correction
-
-The `FeedbackAnalyzer` examines tool results deterministically:
-
-- `run_tests`: Parses `pytest-json-report` output for structured failure details. Generates a suggested fix listing each failed test with file, line, and message.
-- `execute_shell`: Verdict based on exit code.
-- `write_file`: Verdict based on exit code.
-- `read_file` / `search_code`: Returns `UNKNOWN` (no objective pass/fail signal).
-
-The `RetryPolicy` limits retries (`max_retries`, default 3) and detects stuck loops by comparing the last 3 failure signatures. If they are identical, the loop terminates early.
-
----
-
-## Security Boundary
-
-- **Single-user local tool**: Listens on `localhost:8000` only. Not designed for multi-user or public network exposure.
-- **No authentication**: The WebSocket and REST API have no auth layer. Access is restricted by network binding.
-- **Guardrails are defense-in-depth**: They provide reasonable safety for code-generation tasks, but are not security guarantees. Regex-based pattern matching can be bypassed by encoding or indirection.
-- **Credential threat model**: Keys are stored in the OS keyring on desktop, or AES-GCM encrypted on disk in Docker. The encryption password (`HARNESS_KEY_PASSWORD`) must be provided via environment variable. Keys are never logged or exposed in git.
+See [DESIGN.md](DESIGN.md) for the complete Fairy-Tale Dream design system:
+- Pink-white palette (`#fefaf5` backgrounds, `#f8a4c8` accent)
+- Great Vibes + Noto Serif SC + Inter typography
+- Canvas glitter particles + framer-motion animations
+- Fairy orbit around title with magic wand sparkle effects
 
 ---
 

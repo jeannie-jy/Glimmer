@@ -1,4 +1,4 @@
-# SPEC: Lite Agent Harness
+# SPEC: Glimmer
 
 > 一个轻量级、模型无关的 Coding Agent Harness，从零构建，具备确定性护栏与 mock 驱动测试能力。
 

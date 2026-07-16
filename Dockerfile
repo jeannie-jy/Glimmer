@@ -11,11 +11,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY harness/ harness/
 COPY server/ server/
-COPY tests/ tests/
-COPY .harness/ .harness/
-COPY Makefile .
-COPY README.md .
 COPY --from=frontend /app/web/dist/ server/static/
 EXPOSE 8000
-ENV HARNESS_KEY_PASSWORD=""
 CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]
