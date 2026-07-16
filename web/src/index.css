@@ -37,7 +37,7 @@
 
   --text-xs: 11px; --text-sm: 13px; --text-base: 15px; --text-lg: 18px;
   --text-xl: 22px; --text-2xl: 28px;
-  --text-hero: clamp(2.5rem, 6vw, 4.5rem);
+  --text-hero: clamp(4.5rem, 12vw, 8rem);
   --text-tagline-en: clamp(1.2rem, 2.5vw, 1.8rem);
   --text-tagline-zh: clamp(1rem, 1.5vw, 1.3rem);
 

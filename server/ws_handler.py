@@ -228,8 +228,12 @@ def _build_default_tool_registry() -> ToolRegistry:
 def _create_llm_from_config(config: ConfigData, api_key: str) -> object:
     """Create the appropriate LLM adapter based on configuration."""
     provider = config.model_provider.lower()
+    base_url = (config.base_url or "").strip()
+
     if provider == "anthropic":
         return AnthropicAdapter(api_key=api_key, model=config.model_id)
+    elif base_url:
+        return OpenAIAdapter(api_key=api_key, model=config.model_id, base_url=base_url)
     elif provider == "openai":
         return OpenAIAdapter(api_key=api_key, model=config.model_id)
     else:

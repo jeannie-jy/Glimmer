@@ -8,8 +8,11 @@ from harness.models import Message, ToolDef, LLMResponse, TokenUsage, ToolCall
 class OpenAIAdapter(LLMAdapter):
     """Adapter for OpenAI's Chat Completions API."""
 
-    def __init__(self, api_key: str, model: str = "gpt-4o"):
-        self._client = AsyncOpenAI(api_key=api_key, timeout=60.0)
+    def __init__(self, api_key: str, model: str = "gpt-4o", base_url: str | None = None):
+        kwargs = {"api_key": api_key, "timeout": 60.0}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = AsyncOpenAI(**kwargs)
         self._model = model
 
     @staticmethod

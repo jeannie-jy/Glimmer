@@ -29,6 +29,7 @@ class ConfigUpdate(BaseModel):
     """Partial config update payload."""
     model_provider: str | None = None
     model_id: str | None = None
+    base_url: str | None = None
     max_tokens: int | None = None
     max_retries: int | None = None
     sandbox_root: str | None = None

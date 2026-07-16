@@ -5,6 +5,7 @@ const BASE = 'http://localhost:8000';
 export interface ConfigData {
   model_provider: string;
   model_id: string;
+  base_url: string;
   max_tokens: number;
   max_retries: number;
   sandbox_root: string;

@@ -6,7 +6,7 @@ import FairySprite from './FairySprite';
 
 const HeroSection: React.FC = () => {
   const navigate = useNavigate();
-  const scrollToCards = () => document.getElementById('magic-cards')?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToCards = () => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
 
   return (
     <section className="hero">

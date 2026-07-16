@@ -9,76 +9,58 @@ import {
   type CredentialsStatus,
 } from '../services/api';
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-const PROVIDERS = ['anthropic', 'openai'];
-
 const SettingsPanel: React.FC = () => {
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [credStatus, setCredStatus] = useState<CredentialsStatus | null>(null);
   const [provider, setProvider] = useState('anthropic');
+  const [baseUrl, setBaseUrl] = useState('');
   const [modelId, setModelId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Load config & credential status on mount
   useEffect(() => {
     Promise.all([getConfig(), getCredentialsStatus()])
       .then(([cfg, creds]) => {
         setConfig(cfg);
         setCredStatus(creds);
         setProvider(cfg.model_provider);
+        setBaseUrl(cfg.base_url || '');
         setModelId(cfg.model_id);
       })
-      .catch((err: Error) =>
-        setMessage({ type: 'error', text: err.message }),
-      );
+      .catch((err: Error) => setMessage({ type: 'error', text: err.message }));
   }, []);
 
-  const handleSaveConfig = async () => {
+  const handleSave = async () => {
     setSaving(true);
     setMessage(null);
     try {
+      // Save config
       const result = await updateConfig({
         model_provider: provider,
         model_id: modelId,
+        base_url: baseUrl,
       });
       setConfig(result.config);
-      setMessage({ type: 'success', text: 'Configuration saved.' });
+
+      // Save API key if provided
+      if (apiKey.trim()) {
+        await storeCredential(provider, apiKey.trim());
+        setApiKey('');
+        const creds = await getCredentialsStatus();
+        setCredStatus(creds);
+      }
+
+      setMessage({ type: 'success', text: 'Saved.' });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to save config';
+      const msg = err instanceof Error ? err.message : 'Failed to save';
       setMessage({ type: 'error', text: msg });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSaveApiKey = async () => {
-    if (!apiKey.trim()) return;
-    setSaving(true);
-    setMessage(null);
-    try {
-      await storeCredential(provider, apiKey);
-      setApiKey('');
-      const creds = await getCredentialsStatus();
-      setCredStatus(creds);
-      setMessage({ type: 'success', text: 'API key saved.' });
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to save API key';
-      setMessage({ type: 'error', text: msg });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteApiKey = async (prov: string) => {
+  const handleDeleteKey = async (prov: string) => {
     setMessage(null);
     try {
       await deleteCredential(prov);
@@ -86,80 +68,58 @@ const SettingsPanel: React.FC = () => {
       setCredStatus(creds);
       setMessage({ type: 'success', text: `Key for ${prov} deleted.` });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to delete API key';
-      setMessage({ type: 'error', text: msg });
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to delete key' });
     }
   };
+
+  const showBaseUrl = provider !== 'anthropic';
 
   return (
     <div className="settings-panel">
       <h2 className="settings-panel__title">Settings</h2>
 
       {message && (
-        <div className={`settings-panel__message settings-panel__message--${message.type}`}>
-          {message.text}
-        </div>
+        <div className={`settings-panel__message settings-panel__message--${message.type}`}>{message.text}</div>
       )}
 
-      {/* ---- Provider & Model ---- */}
       <div className="settings-panel__section">
         <label className="settings-panel__label">Provider</label>
-        <select
-          className="settings-panel__select"
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
-        >
-          {PROVIDERS.map((p) => (
-            <option key={p} value={p}>
-              {p.charAt(0).toUpperCase() + p.slice(1)}
-            </option>
-          ))}
+        <select className="settings-panel__select" value={provider} onChange={(e) => setProvider(e.target.value)}>
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI Compatible</option>
         </select>
       </div>
 
+      {showBaseUrl && (
+        <div className="settings-panel__section">
+          <label className="settings-panel__label">Base URL</label>
+          <input className="settings-panel__input" type="text" value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="https://api.deepseek.com" />
+          <p className="settings-panel__hint">支持 OpenAI / DeepSeek / Qwen / Ollama / vLLM 等</p>
+        </div>
+      )}
+
       <div className="settings-panel__section">
-        <label className="settings-panel__label">Model ID</label>
-        <input
-          className="settings-panel__input"
-          type="text"
-          value={modelId}
+        <label className="settings-panel__label">Model Name</label>
+        <input className="settings-panel__input" type="text" value={modelId}
           onChange={(e) => setModelId(e.target.value)}
-          placeholder="claude-sonnet-5"
-        />
+          placeholder={provider === 'anthropic' ? 'claude-sonnet-5' : 'deepseek-chat'} />
       </div>
 
-      <button
-        className="settings-panel__btn"
-        onClick={handleSaveConfig}
-        disabled={saving}
-      >
-        {saving ? 'Saving...' : 'Save Config'}
-      </button>
-
-      {/* ---- API Key ---- */}
       <div className="settings-panel__divider" />
 
       <div className="settings-panel__section">
         <label className="settings-panel__label">API Key</label>
-        <input
-          className="settings-panel__input"
-          type="password"
-          value={apiKey}
+        <input className="settings-panel__input" type="password" value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk-..."
-        />
+          placeholder="sk-..." />
       </div>
 
-      <button
-        className="settings-panel__btn"
-        onClick={handleSaveApiKey}
-        disabled={saving || !apiKey.trim()}
-      >
-        {saving ? 'Saving...' : 'Save API Key'}
+      <button className="settings-panel__btn" onClick={handleSave} disabled={saving}>
+        {saving ? 'Saving...' : 'Save'}
       </button>
 
-      {/* ---- Credential status ---- */}
       <div className="settings-panel__divider" />
 
       <div className="settings-panel__section">
@@ -171,13 +131,7 @@ const SettingsPanel: React.FC = () => {
                 <span className="settings-panel__cred-provider">{prov}</span>
                 <span className="settings-panel__cred-status">{status}</span>
                 {status.startsWith('configured') && (
-                  <button
-                    className="settings-panel__cred-delete"
-                    onClick={() => handleDeleteApiKey(prov)}
-                    type="button"
-                  >
-                    Delete
-                  </button>
+                  <button className="settings-panel__cred-delete" onClick={() => handleDeleteKey(prov)} type="button">Delete</button>
                 )}
               </li>
             ))}

@@ -125,6 +125,7 @@ class ConfigData(BaseModel):
     """Harness configuration."""
     model_provider: str = "anthropic"
     model_id: str = "claude-sonnet-5"
+    base_url: str = ""
     max_tokens: int = 4096
     max_retries: int = 3
     sandbox_root: str = "."

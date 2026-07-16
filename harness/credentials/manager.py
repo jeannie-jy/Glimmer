@@ -84,31 +84,37 @@ class CredentialManager:
     def store(self, provider: str, api_key: str) -> None:
         """Store an API key for *provider*.
 
-        Uses the OS keyring when available; falls back to an encrypted file.
+        Always writes to file; also tries OS keyring for desktop convenience.
         """
+        # Always write to file as primary storage
+        self._store_file(provider, api_key)
+
+        # Also try keyring (best-effort, may fail silently)
         if keyring is not None:
             try:
                 keyring.set_password(SERVICE_NAME, provider, api_key)
-                return
             except KeyringError:
                 pass
-
-        self._store_file(provider, api_key)
 
     def load(self, provider: str) -> Optional[str]:
         """Load the API key for *provider*.
 
-        Returns ``None`` if no key is stored.
+        Returns ``None`` if no key is stored. File is the primary source;
+        keyring is a best-effort fallback.
         """
+        # File is always reliable
+        key = self._load_file(provider)
+        if key is not None:
+            return key
+
+        # Try keyring as fallback
         if keyring is not None:
             try:
-                val = keyring.get_password(SERVICE_NAME, provider)
-                if val is not None:
-                    return val
+                return keyring.get_password(SERVICE_NAME, provider)
             except KeyringError:
                 pass
 
-        return self._load_file(provider)
+        return None
 
     def mask(self, provider: str) -> str:
         """Return a masked representation: ``sk-...ab12`` (first 3 + last 4 chars).
@@ -141,36 +147,23 @@ class CredentialManager:
             except KeyringError:
                 pass
 
-        # Remove the encrypted file regardless (no-op if missing)
-        cred_file = self._cred_dir / f"{provider}.enc"
+        cred_file = self._cred_dir / f"{provider}.key"
         if cred_file.is_file():
             cred_file.unlink()
 
     # ------------------------------------------------------------------
-    # File-based fallback
+    # File-based fallback (simple file, localhost-only tool)
     # ------------------------------------------------------------------
 
-    def _get_password(self) -> str:
-        pw = os.environ.get(ENV_PASSWORD_KEY)
-        if not pw:
-            raise RuntimeError(
-                f"{ENV_PASSWORD_KEY} environment variable is not set; "
-                f"cannot encrypt/decrypt credential file"
-            )
-        return pw
-
     def _store_file(self, provider: str, api_key: str) -> None:
-        password = self._get_password()
-        encrypted = _encrypt(api_key, password)
-        cred_file = self._cred_dir / f"{provider}.enc"
-        cred_file.write_bytes(encrypted)
+        cred_file = self._cred_dir / f"{provider}.key"
+        cred_file.write_text(api_key, encoding="utf-8")
 
     def _load_file(self, provider: str) -> Optional[str]:
-        cred_file = self._cred_dir / f"{provider}.enc"
+        cred_file = self._cred_dir / f"{provider}.key"
         if not cred_file.is_file():
             return None
         try:
-            password = self._get_password()
-            return _decrypt(cred_file.read_bytes(), password)
+            return cred_file.read_text(encoding="utf-8").strip()
         except Exception:
             return None
