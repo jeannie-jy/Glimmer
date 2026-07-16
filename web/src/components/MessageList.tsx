@@ -1,8 +1,11 @@
 import React, { useRef, useEffect } from 'react';
 import type { WsServerMessage } from '../hooks/useWebSocket';
+import type { AgentState } from '../hooks/useSession';
 import TextBubble from './TextBubble';
+import UserBubble from './UserBubble';
 import ToolCard from './ToolCard';
 import FeedbackBanner from './FeedbackBanner';
+import StateChip from './StateChip';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -10,26 +13,97 @@ import FeedbackBanner from './FeedbackBanner';
 
 interface MessageListProps {
   messages: WsServerMessage[];
+  task: string;
+  agentState: AgentState;
+  /** Pre-built display items from loaded session history (renders before WS messages) */
+  historyItems?: Array<{ id: number; type: string; data: unknown }>;
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — pair tool.invoke → tool.result
+// Helpers — build display items from raw WebSocket messages
 // ---------------------------------------------------------------------------
 
-/** Merge consecutive tool.invoke/tool.result pairs into one display entry. */
-function buildDisplayItems(messages: WsServerMessage[]) {
-  const items: Array<{ id: number; type: string; data: unknown }> = [];
+function buildDisplayItems(
+  messages: WsServerMessage[],
+  task: string,
+  agentState: AgentState,
+  historyItems?: Array<{ id: number; type: string; data: unknown }>,
+) {
+  const items: Array<{ id: number; type: string; data: unknown }> = [...(historyItems || [])];
   let i = 0;
+
+  // Prepend user task bubble if one was submitted
+  if (task) {
+    items.push({
+      id: -1,
+      type: 'user',
+      data: { content: task },
+    });
+  }
 
   while (i < messages.length) {
     const msg = messages[i];
 
+    // --- State change → inline thinking indicator ---
+    if (msg.type === 'state.change') {
+      const state = msg.to;
+      // Skip idle and completed/error — those are shown as session banner or initial state
+      const meaningful = !['idle', 'completed', 'error'].includes(state);
+      if (meaningful) {
+        // Look ahead for a tool.invoke right after this state change → capture tool name
+        let toolName: string | undefined;
+        if (state === 'executing') {
+          let k = i + 1;
+          while (k < messages.length) {
+            if (messages[k].type === 'tool.invoke') {
+              toolName = messages[k].tool;
+              break;
+            }
+            if (messages[k].type === 'state.change') break;
+            k++;
+          }
+        }
+
+        // Determine if this state chip is still "active" — it is if no subsequent
+        // "resolution" message has arrived yet (llm.response, tool.result, feedback,
+        // another state.change to a different phase, or session terminal).
+        let isActive = agentState === state;
+        // If the current agentState has progressed past this state, it is resolved
+        const stateOrder = ['idle', 'planning', 'executing', 'observing', 'correcting'];
+        const currentIdx = stateOrder.indexOf(agentState);
+        const thisIdx = stateOrder.indexOf(state);
+        if (currentIdx > thisIdx && currentIdx !== -1 && thisIdx !== -1) {
+          isActive = false;
+        }
+        // awaiting_human is special — only active when agent is actually awaiting
+        if (state === 'awaiting_human') {
+          isActive = agentState === 'awaiting_human';
+        }
+
+        // Collapse consecutive identical state transitions
+        const prevItem = items[items.length - 1];
+        const isDuplicate =
+          prevItem?.type === 'state' &&
+          (prevItem.data as { state: string }).state === state;
+
+        if (!isDuplicate) {
+          items.push({
+            id: i,
+            type: 'state',
+            data: { state, from: msg.from, toolName, isActive },
+          });
+        }
+      }
+      i++;
+      continue;
+    }
+
+    // --- LLM response (full) or stream deltas ---
     if (msg.type === 'llm.response' || msg.type === 'llm.stream') {
-      // Accumulate full content from potentially multiple stream messages
       let content = msg.type === 'llm.response' ? msg.content : msg.delta;
       let j = i + 1;
 
-      // If this is a stream, aggregate adjacent stream deltas
+      // Aggregate adjacent stream deltas
       if (msg.type === 'llm.stream') {
         while (j < messages.length && messages[j].type === 'llm.stream') {
           content += (messages[j] as typeof msg).delta;
@@ -43,8 +117,11 @@ function buildDisplayItems(messages: WsServerMessage[]) {
         data: { content, isStreaming: false },
       });
       i = j;
-    } else if (msg.type === 'tool.invoke') {
-      // Look ahead for the corresponding result
+      continue;
+    }
+
+    // --- Tool invocation → paired with result ---
+    if (msg.type === 'tool.invoke') {
       let result = null;
       let j = i + 1;
       while (j < messages.length) {
@@ -72,7 +149,11 @@ function buildDisplayItems(messages: WsServerMessage[]) {
         },
       });
       i = result ? j + 1 : i + 1;
-    } else if (msg.type === 'feedback.analysis') {
+      continue;
+    }
+
+    // --- Feedback analysis ---
+    if (msg.type === 'feedback.analysis') {
       items.push({
         id: i,
         type: 'feedback',
@@ -85,22 +166,45 @@ function buildDisplayItems(messages: WsServerMessage[]) {
         },
       });
       i++;
-    } else if (msg.type === 'session.complete') {
-      items.push({
-        id: i,
-        type: 'session',
-        data: { message: 'Session completed successfully' },
-      });
+      continue;
+    }
+
+    // --- Session terminal ---
+    // Skip session.complete — just a noise banner
+    if (msg.type === 'session.complete') {
       i++;
-    } else if (msg.type === 'session.error') {
+      continue;
+    }
+
+    if (msg.type === 'session.error') {
       items.push({
         id: i,
         type: 'session',
         data: { message: msg.message, isError: true },
       });
       i++;
-    } else {
-      i++;
+      continue;
+    }
+
+    // Skip unknown message types
+    i++;
+  }
+
+  // --- Streaming placeholder: agent is planning but no response yet ---
+  if (agentState === 'planning') {
+    const lastRaw = messages[messages.length - 1];
+    const hasResponse =
+      lastRaw?.type === 'llm.response' ||
+      lastRaw?.type === 'session.complete' ||
+      lastRaw?.type === 'session.error';
+    const lastItem = items[items.length - 1];
+    const lastIsLLm = lastItem?.type === 'llm';
+    if (!hasResponse && !lastIsLLm) {
+      items.push({
+        id: -2,
+        type: 'llm',
+        data: { content: '', isStreaming: true },
+      });
     }
   }
 
@@ -111,7 +215,12 @@ function buildDisplayItems(messages: WsServerMessage[]) {
 // Component
 // ---------------------------------------------------------------------------
 
-const MessageList: React.FC<MessageListProps> = ({ messages }) => {
+const MessageList: React.FC<MessageListProps> = ({
+  messages,
+  task,
+  agentState,
+  historyItems,
+}) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -119,7 +228,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const items = buildDisplayItems(messages);
+  const items = buildDisplayItems(messages, task, agentState, historyItems);
 
   if (items.length === 0) {
     return (
@@ -139,6 +248,42 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
     <div className="message-list">
       {items.map((item) => {
         switch (item.type) {
+          // -- User bubble ---
+          case 'user': {
+            const d = item.data as { content: string };
+            return (
+              <div
+                key={item.id}
+                className="message-list__item message-list__item--user"
+              >
+                <UserBubble content={d.content} />
+              </div>
+            );
+          }
+
+          // --- State chip ---
+          case 'state': {
+            const d = item.data as {
+              state: string;
+              from?: string;
+              toolName?: string;
+              isActive: boolean;
+            };
+            return (
+              <div
+                key={item.id}
+                className="message-list__item message-list__item--state"
+              >
+                <StateChip
+                  state={d.state}
+                  toolName={d.toolName}
+                  isActive={d.isActive}
+                />
+              </div>
+            );
+          }
+
+          // --- LLM text ---
           case 'llm': {
             const d = item.data as { content: string; isStreaming: boolean };
             return (
@@ -151,6 +296,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
             );
           }
 
+          // --- Tool card ---
           case 'tool': {
             const d = item.data as {
               toolName: string;
@@ -176,6 +322,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
             );
           }
 
+          // --- Feedback banner ---
           case 'feedback': {
             const d = item.data as {
               verdict: string;
@@ -202,6 +349,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
             );
           }
 
+          // --- Session terminal ---
           case 'session': {
             const d = item.data as { message: string; isError?: boolean };
             return (

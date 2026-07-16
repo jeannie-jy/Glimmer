@@ -14,6 +14,7 @@ from server.ws_handler import router as ws_router, configure as configure_ws
 from server.api.config_routes import router as config_router, configure_fallback
 from server.api.session_routes import router as session_router
 from server.api.auth_routes import router as auth_router
+from server.api.files_routes import router as files_router
 
 from harness.config import ConfigManager
 from harness.credentials import CredentialManager
@@ -53,6 +54,7 @@ def create_app(project_root: Path | None = None) -> FastAPI:
     app.include_router(config_router, prefix="/api")
     app.include_router(session_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
+    app.include_router(files_router, prefix="/api")
 
     # --- Rate limiting ---
     limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])

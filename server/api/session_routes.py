@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from harness.db.database import get_db
 from harness.db.models import User, Session
@@ -52,7 +53,9 @@ async def get_session(
         raise HTTPException(404, "Session not found")
 
     result = await db.execute(
-        select(Session).where(Session.id == session_id, Session.user_id == user.id)
+        select(Session)
+        .options(selectinload(Session.messages))
+        .where(Session.id == session_id, Session.user_id == user.id)
     )
     session = result.scalar_one_or_none()
     if not session:

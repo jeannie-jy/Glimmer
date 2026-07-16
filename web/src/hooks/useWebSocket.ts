@@ -5,10 +5,14 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 // ---------------------------------------------------------------------------
 
 export type WsClientMessage =
-  | { type: 'task.submit'; content: string }
+  | { type: 'task.submit'; content: string; session_id?: string }
+  | { type: 'session.new' }
+  | { type: 'session.load'; session_id: string }
   | { type: 'guardrail.approve' }
   | { type: 'guardrail.reject' }
-  | { type: 'session.cancel' };
+  | { type: 'session.cancel' }
+  | { type: 'files.list' }
+  | { type: 'files.download'; path: string };
 
 export type WsServerMessage =
   | { type: 'state.change'; from: string; to: string }
@@ -19,7 +23,14 @@ export type WsServerMessage =
   | { type: 'guardrail.pending'; action: string; reason: string; tool?: string; args?: Record<string, unknown> }
   | { type: 'feedback.analysis'; verdict: string; failures?: Array<{ file: string; line?: number; function?: string; message: string }>; summary?: string; suggested_fix?: string; retry_count?: number }
   | { type: 'session.complete' }
-  | { type: 'session.error'; message: string };
+  | { type: 'session.error'; message: string }
+  | { type: 'session.created'; session_id: string }
+  | { type: 'session.saved'; session_id: string }
+  | { type: 'session.loaded'; session_id: string; task: string; message_count: number }
+  | { type: 'file.created'; path: string }
+  | { type: 'file.modified'; path: string }
+  | { type: 'files.list'; files: Array<{ name: string; size: number; modified: string }> }
+  | { type: 'files.content'; path: string; content: string; error?: string };
 
 export interface UseWebSocketReturn {
   send: (msg: WsClientMessage) => void;
@@ -27,6 +38,7 @@ export interface UseWebSocketReturn {
   isConnected: boolean;
   connect: () => void;
   disconnect: () => void;
+  clearMessages: () => void;
   error: string | null;
 }
 
@@ -58,7 +70,11 @@ export function useWebSocket(): UseWebSocketReturn {
   }, []);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // Force-close any existing connection so every connect() starts fresh
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
 
     setError(null);
     setMessages([]);
@@ -88,6 +104,10 @@ export function useWebSocket(): UseWebSocketReturn {
     setIsConnected(false);
   }, []);
 
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, []);
+
   const send = useCallback((msg: WsClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msg));
@@ -106,5 +126,5 @@ export function useWebSocket(): UseWebSocketReturn {
     };
   }, []);
 
-  return { send, messages, isConnected, connect, disconnect, error };
+  return { send, messages, isConnected, connect, disconnect, clearMessages, error };
 }

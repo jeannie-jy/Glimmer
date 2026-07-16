@@ -84,8 +84,23 @@ export async function deleteCredential(provider: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function getSessionHistory(): Promise<{ sessions: unknown[] }> {
-  const res = await fetch(`${BASE}/api/session/history`, { headers: authHeaders() });
+  const res = await fetch(`${BASE}/api/sessions`, { headers: authHeaders() });
   if (!res.ok)
-    throw new Error(`GET /api/session/history failed: ${res.status}`);
+    throw new Error(`GET /api/sessions failed: ${res.status}`);
+  return res.json();
+}
+
+export interface LoadedSession {
+  id: string;
+  task: string;
+  status: string;
+  created_at: string;
+  messages: Array<{ type: string; payload: Record<string, unknown>; created_at: string }>;
+}
+
+export async function getSession(sessionId: string): Promise<LoadedSession> {
+  const res = await fetch(`${BASE}/api/sessions/${sessionId}`, { headers: authHeaders() });
+  if (!res.ok)
+    throw new Error(`GET /api/sessions/${sessionId} failed: ${res.status}`);
   return res.json();
 }

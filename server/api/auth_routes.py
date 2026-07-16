@@ -1,4 +1,7 @@
 """Authentication routes — GitHub OAuth login."""
+import os
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -73,10 +76,9 @@ async def callback(code: str, db: AsyncSession = Depends(get_db)):
         user.avatar_url = user_info["avatar_url"]
 
     token = create_token(str(user.id))
-    return {
-        "token": token,
-        "user": {"id": str(user.id), "login": user.login, "name": user.name, "avatar_url": user.avatar_url},
-    }
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost")
+    params = urlencode({"token": token})
+    return RedirectResponse(f"{frontend_url}/?{params}")
 
 
 @router.get("/auth/me")

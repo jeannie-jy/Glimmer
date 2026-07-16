@@ -90,6 +90,27 @@ class AgentLoop:
 
         return await self._run_loop(session, llm, tool_defs)
 
+    async def continue_turn(self, session: Session, task: str, llm: LLMAdapter) -> Session:
+        """Add a new user message and continue an existing session.
+
+        Reuses the accumulated message history so the LLM has full context
+        across multiple turns within the same session.
+
+        Args:
+            session: An existing session (usually completed from a prior turn).
+            task: The new user task to append.
+            llm: LLM adapter.
+
+        Returns:
+            The updated Session after the loop finishes.
+        """
+        session.messages.append(Message(role="user", content=task))
+        session.task = task
+        session.state = State.PLANNING
+        await self._emit("state.change", **{"from": "completed", "to": session.state.value})
+        tool_defs = self._tools.list_defs()
+        return await self._run_loop(session, llm, tool_defs)
+
     def approve_pending(self, session: Session) -> Session:
         """Approve a tool call that was flagged as ASK_HUMAN.
 

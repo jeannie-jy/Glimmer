@@ -26,6 +26,7 @@ def configure_fallback(config_mgr, cred_mgr):
 
 class ConfigUpdate(BaseModel):
     provider: str | None = None
+    model_provider: str | None = None
     base_url: str | None = None
     model_id: str | None = None
     max_tokens: int | None = None
@@ -33,6 +34,7 @@ class ConfigUpdate(BaseModel):
     timeout_seconds: int | None = None
 
 class CredentialStore(BaseModel):
+    provider: str | None = None
     api_key: str
 
 
@@ -59,6 +61,7 @@ async def get_config(
 
     return {
         "provider": cfg.provider,
+        "model_provider": cfg.provider or "anthropic",
         "base_url": cfg.base_url or "",
         "model_id": cfg.model_id,
         "max_tokens": cfg.max_tokens,
@@ -101,8 +104,10 @@ async def update_config(
         db.add(cfg)
 
     update_data = update.model_dump(exclude_none=True)
-    if "provider" in update_data:
-        cfg.provider = update_data["provider"]
+    # Accept both "provider" and "model_provider" (frontend uses model_provider)
+    provider_val = update_data.get("model_provider") or update_data.get("provider")
+    if provider_val:
+        cfg.provider = provider_val
     if "base_url" in update_data:
         cfg.base_url = update_data["base_url"]
     if "model_id" in update_data:
@@ -143,10 +148,77 @@ async def store_credential(
 
 @router.delete("/config/credentials")
 async def delete_credential(
+    provider: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete stored API key for current user."""
+    del provider  # single-provider for now
+    if _is_local() and _fallback_credential_manager:
+        _fallback_credential_manager.delete("local")
+        return {"status": "ok"}
+
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg:
+        cfg.api_key_enc = None
+        await db.flush()
+    return {"status": "ok"}
+
+
+# ---- Frontend-compatible credential routes (matching api.ts) ----
+
+@router.get("/credentials/status")
+async def credentials_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return credential status per provider (frontend-compatible)."""
+    if _is_local() and _fallback_credential_manager:
+        local_key = _fallback_credential_manager.load("local")
+        return {"providers": {"local": "set" if local_key else "unset"}}
+
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    providers = {}
+    # Detect providers based on user config
+    if cfg and cfg.api_key_enc:
+        provider_name = cfg.provider or "anthropic"
+        providers[provider_name] = "set"
+    return {"providers": providers}
+
+
+@router.post("/credentials")
+async def store_credential_frontend(
+    body: CredentialStore,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Store encrypted API key (frontend-compatible)."""
+    if _is_local() and _fallback_credential_manager:
+        _fallback_credential_manager.store("local", body.api_key)
+        return {"status": "ok"}
+
+    result = await db.execute(select(UserConfig).where(UserConfig.user_id == user.id))
+    cfg = result.scalar_one_or_none()
+    if cfg is None:
+        cfg = UserConfig(user_id=user.id)
+        db.add(cfg)
+
+    encrypted = encrypt_credential(body.api_key)
+    cfg.api_key_enc = encrypted.hex()
+    await db.flush()
+    return {"status": "ok"}
+
+
+@router.delete("/credentials/{provider}")
+async def delete_credential_frontend(
+    provider: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete stored API key (frontend-compatible)."""
+    del provider
     if _is_local() and _fallback_credential_manager:
         _fallback_credential_manager.delete("local")
         return {"status": "ok"}
