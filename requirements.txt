@@ -19,3 +19,8 @@ pytest>=8.0
 pytest-asyncio>=0.24.0
 pytest-json-report>=1.0
 httpx>=0.28.0  # for FastAPI TestClient
+
+# Database
+sqlalchemy[asyncio]>=2.0
+asyncpg>=0.29
+alembic>=1.13
