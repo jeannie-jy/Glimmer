@@ -130,15 +130,18 @@ def test_encrypt_produces_different_ciphers():
     assert c1 != c2  # different nonces
 
 
-def test_file_fallback_on_missing_keyring_password(tmp_path: Path, monkeypatch):
-    """If HARNESS_KEY_PASSWORD is missing, file-based store raises."""
+def test_file_store_and_load_plain(tmp_path: Path):
+    """File-based store/load works without HARNESS_KEY_PASSWORD (plain-text .key files)."""
     proj = tmp_path / "project"
     (proj / ".harness" / "credentials").mkdir(parents=True)
-    monkeypatch.delenv("HARNESS_KEY_PASSWORD", raising=False)
 
     mgr = CredentialManager(proj)
-    with pytest.raises(RuntimeError, match="HARNESS_KEY_PASSWORD"):
-        mgr._get_password()
+    mgr.store("test-provider", "test-key-12345")
+    loaded = mgr.load("test-provider")
+    assert loaded == "test-key-12345"
+    assert mgr.mask("test-provider") == "tes...2345"
+    mgr.delete("test-provider")
+    assert mgr.load("test-provider") is None
 
 
 def test_file_store_and_load(tmp_path: Path, monkeypatch):
