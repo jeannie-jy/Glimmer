@@ -180,6 +180,33 @@ async def _load_session_from_db(
 # WebSocket endpoint
 # ---------------------------------------------------------------------------
 
+async def _send_file_list(websocket, docker_mgr, container_id, LOCAL_MODE):
+    """Send file list from workspace to frontend."""
+    if LOCAL_MODE or docker_mgr is None or container_id is None:
+        await websocket.send_json({"type": "files.list", "files": []})
+        return
+    try:
+        result = await docker_mgr.exec(
+            container_id,
+            "find /workspace -type f -printf '%p\\t%s\\t%TY-%Tm-%TdT%TH:%TM\\n' 2>/dev/null",
+            timeout=10,
+        )
+        files = []
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                p = parts[0].replace("/workspace/", "", 1)
+                if p == "/workspace" or not p:
+                    continue
+                files.append({"name": p, "size": int(parts[1]), "modified": parts[2]})
+        files.sort(key=lambda f: (("/" in f["name"]), f["name"]))
+        await websocket.send_json({"type": "files.list", "files": files})
+    except Exception:
+        await websocket.send_json({"type": "files.list", "files": []})
+
+
 @router.websocket("/ws/session")
 async def websocket_session(websocket: WebSocket) -> None:
     """Main WebSocket session handler with multi-turn support.
@@ -229,7 +256,12 @@ async def websocket_session(websocket: WebSocket) -> None:
             except Exception: pass
             container_id = None
 
-    container_id = await _create_docker_container()
+    try:
+        container_id = await _create_docker_container()
+    except Exception as e:
+        print(f"[WS] Docker unavailable, falling back to local execution: {e}")
+        docker_mgr = None
+        container_id = None
     if not LOCAL_MODE and container_id:
         register_session("pending", docker_mgr, container_id, user_id)
 
@@ -372,7 +404,12 @@ async def websocket_session(websocket: WebSocket) -> None:
         return tools, guardrails, analyzer, policy, loop
 
     # Create Docker container for the initial session
-    container_id = await _create_docker_container()
+    try:
+        container_id = await _create_docker_container()
+    except Exception as e:
+        print(f"[WS] Docker unavailable for session, falling back to local execution: {e}")
+        docker_mgr = None
+        container_id = None
     if not LOCAL_MODE and container_id:
         register_session(harness_session.id, docker_mgr, container_id, user_id)
     tools, guardrails, analyzer, policy, loop = _build_components()
@@ -384,7 +421,9 @@ async def websocket_session(websocket: WebSocket) -> None:
         elif api_key:
             return _create_llm_from_config(config, api_key)
         else:
-            return MockLLMAdapter([])
+            raise RuntimeError(
+                "API Key 未配置。请在 Settings 面板中录入你的 API Key（Anthropic 或 OpenAI 兼容均可）。"
+            )
 
     # ---- Track known files for created vs modified events ----
     _known_files: set[str] = set()
@@ -531,7 +570,12 @@ async def websocket_session(websocket: WebSocket) -> None:
                 await _save_and_notify()
                 harness_session = PydanticSession(id=str(uuid.uuid4()), task="", state=State.IDLE)
                 await _destroy_docker_container()
-                container_id = await _create_docker_container()
+                try:
+                    container_id = await _create_docker_container()
+                except Exception as e:
+                    print(f"[WS] Docker unavailable for new session, falling back to local execution: {e}")
+                    docker_mgr = None
+                    container_id = None
                 if not LOCAL_MODE and container_id:
                     register_session(harness_session.id, docker_mgr, container_id, user_id)
                 # Rebuild components with new container
