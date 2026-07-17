@@ -6,7 +6,7 @@ interface GitHubStats {
   loading: boolean;
 }
 
-const REPO = 'jingyu-wang/lite-agent-harness';
+const REPO = 'jeannie-jy/Glimmer';
 const API = `https://api.github.com/repos/${REPO}`;
 
 export function useGitHubStars(): GitHubStats {

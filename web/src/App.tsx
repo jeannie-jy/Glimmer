@@ -14,7 +14,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import './styles/magic-animations.css';
 import './styles/nav.css';
 
-const GITHUB_URL = 'https://github.com/jingyu-wang/lite-agent-harness';
+const GITHUB_URL = 'https://github.com/jeannie-jy/Glimmer';
 
 const GitHubRedirect: React.FC = () => {
   React.useEffect(() => {

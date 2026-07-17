@@ -492,11 +492,11 @@ const AboutPage: React.FC = () => (
         viewport={{ once: true }}
       >
         <p>Built with ❤️ using Python, FastAPI, React, and a love for deterministic software.</p>
-        <p>MIT License · Copyright © 2026 <a href="https://github.com/jingyu-wang" target="_blank" rel="noopener noreferrer">Jingyu Wang</a></p>
+        <p>MIT License · Copyright © 2026 <a href="https://github.com/jeannie-jy" target="_blank" rel="noopener noreferrer">Jingyu Wang</a></p>
         <p className="about-page__footer-links">
-          <a href="https://github.com/jingyu-wang/lite-agent-harness" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/jeannie-jy/Glimmer" target="_blank" rel="noopener noreferrer">GitHub</a>
           <span>·</span>
-          <a href="https://github.com/jingyu-wang/lite-agent-harness/issues" target="_blank" rel="noopener noreferrer">Issues</a>
+          <a href="https://github.com/jeannie-jy/Glimmer/issues" target="_blank" rel="noopener noreferrer">Issues</a>
           <span>·</span>
           <a href="/SPEC.md">SPEC</a>
         </p>

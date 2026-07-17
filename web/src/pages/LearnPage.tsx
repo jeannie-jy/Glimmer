@@ -296,10 +296,10 @@ const DEMOS = [
 ];
 
 const DOCS = [
-  { label: 'SPEC.md — 完整技术规约', href: 'https://github.com/jingyu-wang/lite-agent-harness/blob/main/SPEC.md', desc: '27 KB，涵盖问题陈述、功能规约、数据模型、非功能性需求', external: true },
-  { label: 'DESIGN.md — 设计系统', href: 'https://github.com/jingyu-wang/lite-agent-harness/blob/main/DESIGN.md', desc: 'Fairy-Tale Dream 主题，CSS 变量、排版、动效系统', external: true },
-  { label: 'README.md — 项目文档', href: 'https://github.com/jingyu-wang/lite-agent-harness/blob/main/README.zh.md', desc: '快速开始、API 参考、WebSocket 协议、部署指南', external: true },
-  { label: 'GitHub Wiki', href: 'https://github.com/jingyu-wang/lite-agent-harness/wiki', desc: '更多资源和社区文档', external: true },
+  { label: 'SPEC.md — 完整技术规约', href: 'https://github.com/jeannie-jy/Glimmer/blob/main/SPEC.md', desc: '27 KB，涵盖问题陈述、功能规约、数据模型、非功能性需求', external: true },
+  { label: 'DESIGN.md — 设计系统', href: 'https://github.com/jeannie-jy/Glimmer/blob/main/DESIGN.md', desc: 'Fairy-Tale Dream 主题，CSS 变量、排版、动效系统', external: true },
+  { label: 'README.md — 项目文档', href: 'https://github.com/jeannie-jy/Glimmer/blob/main/README.zh.md', desc: '快速开始、API 参考、WebSocket 协议、部署指南', external: true },
+  { label: 'GitHub Wiki', href: 'https://github.com/jeannie-jy/Glimmer/wiki', desc: '更多资源和社区文档', external: true },
 ];
 
 // ---------------------------------------------------------------------------
