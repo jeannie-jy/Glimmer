@@ -2,9 +2,10 @@
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -64,7 +65,21 @@ def create_app(project_root: Path | None = None) -> FastAPI:
     # --- Serve frontend static files in production ---
     static_dir = Path(__file__).parent / "static"
     if static_dir.is_dir():
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+        # Serve static assets (JS, CSS, favicon, etc.) at their exact paths
+        app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+
+        # SPA fallback: serve index.html for all unmatched non-API paths
+        @app.get("/{rest_of_path:path}")
+        async def spa_fallback(rest_of_path: str):
+            # Try to serve the requested file first (e.g. favicon.svg)
+            file_path = static_dir / rest_of_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+            # SPA fallback — let React Router handle it
+            index_path = static_dir / "index.html"
+            if index_path.is_file():
+                return FileResponse(index_path)
+            return {"detail": "Not Found"}
 
     # --- Database init (skipped in local mode) ---
     if not LOCAL_MODE:
