@@ -346,6 +346,13 @@ memory:
 // Sub-components
 // ---------------------------------------------------------------------------
 
+const scrollToSection = (id: string) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
 const SectionNav: React.FC<{ sections: GuideSection[]; activeId: string; onSelect: (id: string) => void }> = ({ sections, activeId, onSelect }) => (
   <nav className="guide-nav">
     <h4 className="guide-nav__title">目录</h4>
@@ -353,7 +360,7 @@ const SectionNav: React.FC<{ sections: GuideSection[]; activeId: string; onSelec
       <button
         key={s.id}
         className={`guide-nav__item ${activeId === s.id ? 'guide-nav__item--active' : ''}`}
-        onClick={() => onSelect(s.id)}
+        onClick={() => { onSelect(s.id); scrollToSection(s.id); }}
         type="button"
       >
         <span className="guide-nav__icon">{s.icon}</span>
@@ -369,6 +376,27 @@ const SectionNav: React.FC<{ sections: GuideSection[]; activeId: string; onSelec
 
 const GuidePage: React.FC = () => {
   const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
+
+  // Update active section based on scroll position
+  React.useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: '-20% 0px -70% 0px', threshold: 0 },
+    );
+
+    SECTIONS.forEach(s => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <PageTransition>
