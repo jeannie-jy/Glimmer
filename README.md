@@ -5,7 +5,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jingyu-wang/lite-agent-harness/actions"><img src="https://img.shields.io/github/actions/workflow/status/jingyu-wang/lite-agent-harness/ci.yml?branch=main&style=flat-square" alt="CI"></a>
+  <a href="https://github.com/jeannie-jy/Glimmer/actions"><img src="https://img.shields.io/github/actions/workflow/status/jeannie-jy/Glimmer/ci.yml?branch=main&style=flat-square" alt="CI"></a>
+  <a href="https://glimmer-l5yr.onrender.com"><img src="https://img.shields.io/badge/live-demo-F8A4C8?style=flat-square" alt="Live Demo"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square" alt="Python"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-22%2B-green?style=flat-square" alt="Node"></a>
@@ -15,6 +16,10 @@
 
 <p align="center">
   <em>"每一次编码，都是一场施法" — SpellCraft your code with Glimmer.</em>
+</p>
+
+<p align="center">
+  🌐 <strong>在线体验</strong>：<a href="https://glimmer-l5yr.onrender.com">https://glimmer-l5yr.onrender.com</a>
 </p>
 
 ---
@@ -246,6 +251,17 @@ pyinstaller pyinstaller.spec
 # 运行
 ./dist/lite-agent-harness
 ```
+
+### Render 云部署
+
+在线体验地址：**[https://glimmer-l5yr.onrender.com](https://glimmer-l5yr.onrender.com)**
+
+部署于 [Render](https://render.com) 平台，架构为 Web Service（FastAPI） + PostgreSQL（托管数据库）。
+
+所需环境变量见[上表](#环境变量)，特别注意事项：
+- `DATABASE_URL` 需将 Render 提供的 `postgres://` 改为 `postgresql+asyncpg://`
+- `OAUTH_REDIRECT_URI` 设为 `https://glimmer-l5yr.onrender.com/api/auth/callback`
+- `FRONTEND_URL` 设为 `https://glimmer-l5yr.onrender.com`
 
 **已知限制**：Windows SmartScreen / macOS Gatekeeper 首次运行可能弹窗警告。若系统未安装 ripgrep，`search_code` 会回退到 Python grep。
 

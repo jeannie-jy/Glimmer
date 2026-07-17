@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGitHubStars } from '../hooks/useGitHubStars';
 
-const REPO_URL = 'https://github.com/jingyu-wang/lite-agent-harness';
+const REPO_URL = 'https://github.com/jeannie-jy/Glimmer';
 
 const GitHubStarButton: React.FC = () => {
   const { stars, loading } = useGitHubStars();

@@ -49,7 +49,7 @@ const ConceptCards: React.FC = () => {
       <div className="learn-links">
         <a href="/README.md" className="learn-link">README — 项目文档</a>
         <a href="/DESIGN.md" className="learn-link">DESIGN.md — 设计系统</a>
-        <a href="https://github.com/jingyu-wang/lite-agent-harness/wiki" target="_blank" rel="noopener noreferrer" className="learn-link">GitHub Wiki — 更多资源</a>
+        <a href="https://github.com/jeannie-jy/Glimmer/wiki" target="_blank" rel="noopener noreferrer" className="learn-link">GitHub Wiki — 更多资源</a>
       </div>
 
       <h2 className="learn-section__title" style={{ marginTop: 'var(--space-8)' }}><Play size={20} /> 演示 Demo</h2>

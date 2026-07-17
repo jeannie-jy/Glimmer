@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useGitHubStars } from '../hooks/useGitHubStars';
 import { Star, GitFork, Clipboard } from 'lucide-react';
 
-const REPO_URL = 'https://github.com/jingyu-wang/lite-agent-harness';
+const REPO_URL = 'https://github.com/jeannie-jy/Glimmer';
 
 const GitHubCommunity: React.FC = () => {
   const { stars, forks, loading } = useGitHubStars();

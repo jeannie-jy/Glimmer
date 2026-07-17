@@ -103,8 +103,8 @@ const SECTIONS: GuideSection[] = [
               </div>
               <pre className="guide-code-block__code">
 {`# 1. 克隆仓库
-git clone https://github.com/jingyu-wang/lite-agent-harness.git
-cd lite-agent-harness
+git clone https://github.com/jeannie-jy/Glimmer.git
+cd Glimmer
 
 # 2. 安装 Python 依赖
 pip install -r requirements.txt
