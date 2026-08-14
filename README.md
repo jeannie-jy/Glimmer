@@ -225,7 +225,7 @@ make deploy
 | `OAUTH_REDIRECT_URI` | 否 | `http://localhost:8000/api/auth/callback` | OAuth 回调地址 |
 | `DOCKER_HOST` | 否 | `unix:///var/run/docker.sock` | Docker 守护进程地址 |
 | `SANDBOX_IMAGE` | 否 | `glimmer-sandbox:latest` | 沙箱容器镜像 |
-| `WORKSPACE_ROOT` | 否 | `/workspace` | 共享工作区挂载点 |
+| `WORKSPACE_ROOT` | 否 | `/workspace` | 共享工作区挂载点；无 Docker 沙箱时，agent 文件操作与 Files 面板均以此为根（不设置则回退服务器 cwd） |
 | `FRONTEND_URL` | 否 | `http://localhost` | 前端 URL（用于 OAuth 重定向） |
 
 ### 手动 Docker 构建
@@ -266,6 +266,7 @@ pyinstaller pyinstaller.spec
 - `DATABASE_URL` 需将 Render 提供的 `postgres://` 改为 `postgresql+asyncpg://`
 - `OAUTH_REDIRECT_URI` 设为 `https://glimmer-l5yr.onrender.com/api/auth/callback`
 - `FRONTEND_URL` 设为 `https://glimmer-l5yr.onrender.com`
+- `WORKSPACE_ROOT` 设为 `/workspace`（Render 无 Docker socket，agent 文件操作与 Files 面板均以该目录为根，避免暴露应用源码树）
 
 **已知限制**：Windows SmartScreen / macOS Gatekeeper 首次运行可能弹窗警告。若系统未安装 ripgrep，`search_code` 会回退到 Python grep。
 
