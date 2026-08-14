@@ -1,4 +1,5 @@
 """File operation tools — local or sandbox-container aware."""
+import posixpath
 import shlex
 import time
 from pathlib import Path
@@ -7,17 +8,26 @@ from harness.models import ToolResult
 
 
 def _sandbox_path(path: str) -> str:
-    """Ensure a path is under /workspace for sandbox containers."""
-    p = Path(path)
-    if p.is_absolute():
-        return str(p)
-    return f"/workspace/{p}"
+    """Ensure a path is under /workspace for sandbox containers.
+
+    posix semantics throughout — these paths are resolved against the Linux
+    container filesystem regardless of the host platform (on a Windows host,
+    ``Path`` would rewrite ``/workspace/x`` into ``\\workspace\\x`` and the
+    container would create a literal backslash directory).
+    """
+    clean = path.replace("\\", "/")
+    if clean.startswith("/"):
+        return clean
+    return f"/workspace/{clean}"
 
 
 class ReadFileTool(Tool):
-    def __init__(self, docker_mgr=None, container_id=None):
+    def __init__(self, docker_mgr=None, container_id=None, workspace_root: Path | None = None):
         self._docker_mgr = docker_mgr
         self._container_id = container_id
+        # Local mode: resolve relative paths under the workspace root
+        # (WORKSPACE_ROOT) when set; otherwise relative to the process cwd.
+        self._workspace_root = workspace_root
 
     @property
     def name(self) -> str:
@@ -63,7 +73,8 @@ class ReadFileTool(Tool):
                     duration_ms=int((time.time() - start) * 1000))
 
         try:
-            content = Path(path).read_text(encoding="utf-8")
+            p = self._workspace_root / path if self._workspace_root else Path(path)
+            content = p.read_text(encoding="utf-8")
             lines = content.splitlines()
             if offset > 0: lines = lines[offset - 1:]
             if limit is not None: lines = lines[:limit]
@@ -75,9 +86,12 @@ class ReadFileTool(Tool):
 
 
 class WriteFileTool(Tool):
-    def __init__(self, docker_mgr=None, container_id=None):
+    def __init__(self, docker_mgr=None, container_id=None, workspace_root: Path | None = None):
         self._docker_mgr = docker_mgr
         self._container_id = container_id
+        # Local mode: resolve relative paths under the workspace root
+        # (WORKSPACE_ROOT) when set; otherwise relative to the process cwd.
+        self._workspace_root = workspace_root
 
     @property
     def name(self) -> str:
@@ -107,7 +121,7 @@ class WriteFileTool(Tool):
             spath = _sandbox_path(path)
             try:
                 import base64
-                parent = str(Path(spath).parent)
+                parent = posixpath.dirname(spath)
                 await self._docker_mgr.exec(self._container_id, f"mkdir -p {shlex.quote(parent)}", timeout=5)
                 encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
                 result = await self._docker_mgr.exec(self._container_id,
@@ -124,7 +138,7 @@ class WriteFileTool(Tool):
                     duration_ms=int((time.time() - start) * 1000))
 
         try:
-            p = Path(path)
+            p = self._workspace_root / path if self._workspace_root else Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content, encoding="utf-8")
             return ToolResult(tool_name="write_file", exit_code=0,

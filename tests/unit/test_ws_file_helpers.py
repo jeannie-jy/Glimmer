@@ -4,6 +4,7 @@ import shlex
 from types import SimpleNamespace
 
 from server.ws_handler import (
+    _workspace_root,
     _safe_local_path,
     _list_local_files,
     _upload_local,
@@ -86,6 +87,85 @@ def test_list_local_files_skips_vcs_and_tooling_dirs(tmp_path, monkeypatch):
     assert "node_modules/x.js" not in names
     for f in files:
         assert set(f.keys()) == {"name", "size", "modified"}
+
+
+# ---- Workspace root (WORKSPACE_ROOT env) ----
+
+def test_workspace_root_defaults_to_cwd(tmp_path, monkeypatch):
+    monkeypatch.delenv("WORKSPACE_ROOT", raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert _workspace_root() == tmp_path
+
+
+def test_workspace_root_env_redirects(tmp_path, monkeypatch):
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.chdir(tmp_path)
+    assert _workspace_root() == ws
+
+
+def test_workspace_root_created_if_missing(tmp_path, monkeypatch):
+    target = tmp_path / "nested" / "ws"
+    monkeypatch.setenv("WORKSPACE_ROOT", str(target))
+    monkeypatch.chdir(tmp_path)
+    assert _workspace_root().is_dir()
+
+
+def test_list_local_files_respects_workspace_root(tmp_path, monkeypatch):
+    ws = tmp_path / "workspace"
+    (ws / "proj").mkdir(parents=True)
+    (ws / "proj" / "a.py").write_text("x")
+    (tmp_path / "server_src.py").write_text("y")  # cwd file, must NOT appear
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.chdir(tmp_path)
+
+    names = [f["name"] for f in _list_local_files()]
+    assert "proj/a.py" in names
+    assert "server_src.py" not in names
+
+
+def test_safe_local_path_respects_workspace_root(tmp_path, monkeypatch):
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.chdir(tmp_path)
+    assert _safe_local_path("notes/a.txt") == ws / "notes" / "a.txt"
+    assert _safe_local_path("../outside.txt") is None
+
+
+def test_upload_local_writes_under_workspace_root(tmp_path, monkeypatch):
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.chdir(tmp_path)
+    b64 = base64.b64encode("payload".encode()).decode()
+    assert _upload_local("notes/a.txt", b64) is None
+    assert (ws / "notes" / "a.txt").read_text() == "payload"
+    assert not (tmp_path / "notes").exists()
+
+
+# ---- Skip lists (defense in depth when workspace root falls back to cwd) ----
+
+def test_list_local_files_skips_app_source_dirs_and_secrets(tmp_path, monkeypatch):
+    monkeypatch.delenv("WORKSPACE_ROOT", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.py").write_text("print('hi')")
+    for d in ("harness", "server", "web", "tests", "docs", ".github", ".agents", ".superpowers"):
+        (tmp_path / d).mkdir()
+        (tmp_path / d / "f.txt").write_text("x")
+    for f in (".env", ".env.example", "prod.key", "cert.pem"):
+        (tmp_path / f).write_text("SECRET")
+
+    names = [f["name"] for f in _list_local_files()]
+    assert "src/main.py" in names
+    for hidden in (
+        "harness/f.txt", "server/f.txt", "web/f.txt", "tests/f.txt", "docs/f.txt",
+        ".github/f.txt", ".agents/f.txt", ".superpowers/f.txt",
+        ".env", ".env.example", "prod.key", "cert.pem",
+    ):
+        assert hidden not in names
 
 
 # ---- Docker helpers ----
