@@ -18,7 +18,12 @@ class PathSandbox:
         self._readable_dirs.add(path.resolve())
 
     def validate(self, path_str: str, mode: str) -> GuardResult:
-        target = Path(path_str).resolve()
+        p = Path(path_str)
+        # Relative paths are relative to the sandbox root, not the process
+        # cwd — the file tools resolve them against the workspace root, so a
+        # cwd-relative check would block every relative path whenever the
+        # sandbox root differs from cwd (e.g. WORKSPACE_ROOT=/workspace).
+        target = (self._root / p).resolve() if not p.is_absolute() else p.resolve()
         if mode == "write":
             allowed = any(
                 target == d

@@ -33,3 +33,18 @@ class TestPathSandbox:
         # Even if resolve() escapes root, block it
         result = sandbox.validate(str(tmp_path / ".." / ".." / "etc" / "passwd"), "read")
         assert result.action == GuardAction.BLOCK
+
+    def test_allows_relative_path_resolved_against_root(self, sandbox, tmp_path):
+        # Relative paths must resolve against the sandbox root, not the
+        # process cwd — otherwise agents writing under a workspace root that
+        # differs from cwd (e.g. WORKSPACE_ROOT=/workspace on Render) get
+        # every relative path blocked as "outside sandbox".
+        f = tmp_path / "notes" / "a.txt"
+        f.parent.mkdir()
+        f.write_text("hi")
+        result = sandbox.validate("notes/a.txt", "read")
+        assert result.action == GuardAction.ALLOW
+
+    def test_blocks_relative_traversal_escaping_root(self, sandbox):
+        result = sandbox.validate("../outside.txt", "write")
+        assert result.action == GuardAction.BLOCK
