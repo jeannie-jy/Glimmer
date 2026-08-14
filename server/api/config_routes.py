@@ -1,13 +1,14 @@
 """Per-user configuration REST endpoints."""
 import os
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from harness.db.database import get_db
+from harness.db.database import get_db_optional
 from harness.db.models import User, UserConfig
 from server.api.auth_routes import get_current_user
+from server.rate_limit import limiter
 from harness.auth.crypto import encrypt_credential, decrypt_credential
 from harness.models import ConfigData
 
@@ -43,10 +44,29 @@ def _is_local() -> bool:
     return not os.environ.get("DATABASE_URL")
 
 
+def _config_payload(cfg) -> dict:
+    """Shape the frontend GET /api/config response from a UserConfig row."""
+    return {
+        "provider": cfg.provider,
+        "model_provider": cfg.provider or "anthropic",
+        "base_url": cfg.base_url or "",
+        "model_id": cfg.model_id,
+        "max_tokens": cfg.max_tokens,
+        "max_retries": cfg.max_retries,
+        "timeout_seconds": cfg.timeout_seconds,
+        "has_api_key": bool(cfg.api_key_enc),
+        "command_whitelist_extra": [],
+        "sandbox_root": ".",
+        "enabled_tools": ["read_file", "write_file", "execute_shell", "run_tests", "search_code"],
+        "max_context_tokens": 8000,
+        "learnings_limit": 20,
+    }
+
+
 @router.get("/config")
 async def get_config(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     if _is_local() and _fallback_config_manager:
         cfg = _fallback_config_manager.load()
@@ -59,29 +79,16 @@ async def get_config(
         db.add(cfg)
         await db.flush()
 
-    return {
-        "provider": cfg.provider,
-        "model_provider": cfg.provider or "anthropic",
-        "base_url": cfg.base_url or "",
-        "model_id": cfg.model_id,
-        "max_tokens": cfg.max_tokens,
-        "max_retries": cfg.max_retries,
-        "timeout_seconds": cfg.timeout_seconds,
-        "model_provider": cfg.provider,
-        "has_api_key": bool(cfg.api_key_enc),
-        "command_whitelist_extra": [],
-        "sandbox_root": ".",
-        "enabled_tools": ["read_file", "write_file", "execute_shell", "run_tests", "search_code"],
-        "max_context_tokens": 8000,
-        "learnings_limit": 20,
-    }
+    return _config_payload(cfg)
 
 
 @router.put("/config")
+@limiter.limit("30/minute")
 async def update_config(
+    request: Request,
     update: ConfigUpdate,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     if _is_local() and _fallback_config_manager:
         # Local mode: write to yaml file
@@ -120,14 +127,18 @@ async def update_config(
         cfg.timeout_seconds = update_data["timeout_seconds"]
 
     await db.flush()
-    return {"status": "ok"}
+    # Include the updated config so the frontend can refresh its state
+    # (parity with the local-mode branch below).
+    return {"status": "ok", "config": _config_payload(cfg)}
 
 
 @router.post("/config/credentials")
+@limiter.limit("10/minute")
 async def store_credential(
+    request: Request,
     body: CredentialStore,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Store encrypted API key for current user."""
     if _is_local() and _fallback_credential_manager:
@@ -147,10 +158,12 @@ async def store_credential(
 
 
 @router.delete("/config/credentials")
+@limiter.limit("10/minute")
 async def delete_credential(
+    request: Request,
     provider: str | None = None,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Delete stored API key for current user."""
     del provider  # single-provider for now
@@ -171,7 +184,7 @@ async def delete_credential(
 @router.get("/credentials/status")
 async def credentials_status(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Return credential status per provider (frontend-compatible)."""
     if _is_local() and _fallback_credential_manager:
@@ -189,10 +202,12 @@ async def credentials_status(
 
 
 @router.post("/credentials")
+@limiter.limit("10/minute")
 async def store_credential_frontend(
+    request: Request,
     body: CredentialStore,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Store encrypted API key (frontend-compatible)."""
     if _is_local() and _fallback_credential_manager:
@@ -212,10 +227,12 @@ async def store_credential_frontend(
 
 
 @router.delete("/credentials/{provider}")
+@limiter.limit("10/minute")
 async def delete_credential_frontend(
+    request: Request,
     provider: str,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Delete stored API key (frontend-compatible)."""
     del provider

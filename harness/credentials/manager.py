@@ -84,10 +84,20 @@ class CredentialManager:
     def store(self, provider: str, api_key: str) -> None:
         """Store an API key for *provider*.
 
-        Always writes to file; also tries OS keyring for desktop convenience.
+        When ``HARNESS_KEY_PASSWORD`` is set the key is written AES-GCM
+        encrypted to ``{provider}.enc``. Without it, a plaintext ``{provider}.key``
+        (chmod 0600) is used as a best-effort fallback for localhost-only use.
         """
-        # Always write to file as primary storage
-        self._store_file(provider, api_key)
+        password = os.environ.get(ENV_PASSWORD_KEY)
+        if password:
+            enc_file = self._cred_dir / f"{provider}.enc"
+            enc_file.write_bytes(_encrypt(api_key, password))
+            # Drop any stale plaintext copy
+            stale = self._cred_dir / f"{provider}.key"
+            if stale.is_file():
+                stale.unlink()
+        else:
+            self._store_file(provider, api_key)
 
         # Also try keyring (best-effort, may fail silently)
         if keyring is not None:
@@ -99,10 +109,20 @@ class CredentialManager:
     def load(self, provider: str) -> Optional[str]:
         """Load the API key for *provider*.
 
-        Returns ``None`` if no key is stored. File is the primary source;
-        keyring is a best-effort fallback.
+        Returns ``None`` if no key is stored. Encrypted files take precedence;
+        a wrong/missing password yields ``None``. Plaintext file and keyring
+        remain as best-effort fallbacks.
         """
-        # File is always reliable
+        enc_file = self._cred_dir / f"{provider}.enc"
+        if enc_file.is_file():
+            password = os.environ.get(ENV_PASSWORD_KEY)
+            if not password:
+                return None
+            try:
+                return _decrypt(enc_file.read_bytes(), password)
+            except Exception:
+                return None
+
         key = self._load_file(provider)
         if key is not None:
             return key
@@ -140,24 +160,31 @@ class CredentialManager:
         return f"configured ({self.mask(provider)})"
 
     def delete(self, provider: str) -> None:
-        """Delete the stored API key for *provider*."""
+        """Delete the stored API key for *provider* (encrypted and plaintext)."""
         if keyring is not None:
             try:
                 keyring.delete_password(SERVICE_NAME, provider)
             except KeyringError:
                 pass
 
-        cred_file = self._cred_dir / f"{provider}.key"
-        if cred_file.is_file():
-            cred_file.unlink()
+        for suffix in (".key", ".enc"):
+            cred_file = self._cred_dir / f"{provider}{suffix}"
+            try:
+                cred_file.unlink()
+            except FileNotFoundError:
+                pass
 
     # ------------------------------------------------------------------
-    # File-based fallback (simple file, localhost-only tool)
+    # File-based fallback (plaintext .key, localhost-only tool)
     # ------------------------------------------------------------------
 
     def _store_file(self, provider: str, api_key: str) -> None:
         cred_file = self._cred_dir / f"{provider}.key"
         cred_file.write_text(api_key, encoding="utf-8")
+        try:
+            cred_file.chmod(0o600)
+        except OSError:
+            pass  # best-effort; Windows permission bits differ
 
     def _load_file(self, provider: str) -> Optional[str]:
         cred_file = self._cred_dir / f"{provider}.key"

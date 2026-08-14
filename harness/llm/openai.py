@@ -17,6 +17,7 @@ class OpenAIAdapter(LLMAdapter):
 
     @staticmethod
     def _to_openai_messages(messages: list[Message]) -> list[dict]:
+        import json
         converted = []
         for m in messages:
             if m.role == "tool":
@@ -24,6 +25,21 @@ class OpenAIAdapter(LLMAdapter):
                     "role": "tool",
                     "tool_call_id": m.tool_call_id,
                     "content": m.content,
+                })
+            elif m.role == "assistant" and m.tool_calls:
+                # Rebuild tool_calls so the tool messages that follow keep
+                # their pair.
+                converted.append({
+                    "role": "assistant",
+                    "content": m.content,
+                    "tool_calls": [{
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.name,
+                            "arguments": json.dumps(tc.arguments),
+                        },
+                    } for tc in m.tool_calls],
                 })
             else:
                 converted.append({"role": m.role, "content": m.content})

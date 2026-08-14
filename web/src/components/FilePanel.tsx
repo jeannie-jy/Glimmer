@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import type { WsServerMessage } from '../hooks/useWebSocket';
+import type { WsServerMessage, WsClientMessage } from '../hooks/useWebSocket';
 import { File, Folder, Download, Eye, RefreshCw, Trash2 } from 'lucide-react';
 
 interface FileInfo { name: string; size: number; modified: string; }
 interface FilePanelProps {
   messages: WsServerMessage[];
-  onSend: (msg: { type: string; path?: string }) => void;
+  onSend: (msg: WsClientMessage) => void;
   isConnected: boolean;
 }
 

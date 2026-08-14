@@ -17,6 +17,10 @@ buildNumber.properties
 .classpath
 .claude
 
+# AI agent tooling (local only)
+.superpowers/
+.agents/
+
 # Harness files
 .harness/memory/
 .harness/credentials/

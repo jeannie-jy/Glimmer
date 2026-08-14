@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import PageTransition from '../components/PageTransition';
-import { useWebSocket, type WsServerMessage } from '../hooks/useWebSocket';
+import { useWebSocket, type WsServerMessage, type WsClientMessage } from '../hooks/useWebSocket';
 import type { Attachment } from '../components/InputBar';
 import { useSession, type AgentState } from '../hooks/useSession';
 import ChatView from '../components/ChatView';
@@ -49,7 +49,7 @@ const AgentPage: React.FC = () => {
     if (attachments && attachments.length > 0) {
       if (!isConnected) { connect(); await new Promise(r => setTimeout(r, 300)); }
       const fileList = attachments.map(a => `${a.name} (${a.size < 1024 ? `${a.size}B` : a.size < 1048576 ? `${(a.size/1024).toFixed(1)}KB` : `${(a.size/1048576).toFixed(1)}MB`})`).join(', ');
-      for (const att of attachments) send({ type: 'files.upload', path: att.name, content: att.contentB64 } as any);
+      for (const att of attachments) send({ type: 'files.upload', path: att.name, content: att.contentB64 });
       await new Promise(r => setTimeout(r, 500));
       contextText = `[User has uploaded these files to the working directory: ${fileList}]\n\n${text || 'Please analyze the attached files.'}`;
     }
@@ -77,6 +77,10 @@ const AgentPage: React.FC = () => {
   const handleGuardrailApprove = useCallback(() => { send({ type: 'guardrail.approve' }); }, [send]);
   const handleGuardrailReject = useCallback(() => { send({ type: 'guardrail.reject' }); }, [send]);
 
+  // Stable reference — FilePanel's connect effect refires files.list whenever
+  // onSend changes, so an inline callback here would loop forever.
+  const handlePanelSend = useCallback((msg: WsClientMessage) => { send(msg); }, [send]);
+
   const chatState: AgentState = state === 'idle' && !task ? 'idle' : state;
   const displayTask = historyItems.length > 0 ? '' : task;
   const displayState: AgentState = historyItems.length > 0 ? (messages.length > 0 ? state : 'idle') : chatState;
@@ -101,7 +105,7 @@ const AgentPage: React.FC = () => {
             <button className={`agent-page__sidebar-tab ${filesOpen ? 'agent-page__sidebar-tab--active' : ''}`} onClick={() => { setFilesOpen(!filesOpen); setSettingsOpen(false); }} type="button"><FolderOpen size={14} /> Files</button>
           </div>
           {settingsOpen && <SettingsPanel />}
-          {filesOpen && <FilePanel messages={messages} onSend={(msg) => send(msg as { type: string; path?: string })} isConnected={isConnected} />}
+          {filesOpen && <FilePanel messages={messages} onSend={handlePanelSend} isConnected={isConnected} />}
         </aside>
         <GuardrailModal guardrail={pendingGuardrail} onApprove={handleGuardrailApprove} onReject={handleGuardrailReject} />
       </div>

@@ -4,11 +4,20 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 
-_SECRET = os.environ.get("GLIMMER_SECRET_KEY", "dev-secret-change-me")
+def _secret() -> str:
+    """Return the encryption secret.
+
+    Raises RuntimeError when GLIMMER_SECRET_KEY is not set — encrypting with
+    a hardcoded dev default would be equivalent to storing keys in plaintext.
+    """
+    secret = os.environ.get("GLIMMER_SECRET_KEY")
+    if not secret:
+        raise RuntimeError("GLIMMER_SECRET_KEY is not set")
+    return secret
 
 
 def _derive_key() -> bytes:
-    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"glimmer-creds").derive(_SECRET.encode())
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"glimmer-creds").derive(_secret().encode())
 
 
 def encrypt_credential(plaintext: str) -> bytes:

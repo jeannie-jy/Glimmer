@@ -246,14 +246,19 @@ class AgentLoop:
                     await self._emit("state.change", **{"from": prev.value, "to": session.state.value})
                     continue
 
-                # Filter messages: send the LLM a clean conversation history
-                msgs = [m for m in session.messages if m.role != "tool" or m.content.startswith("Exit code")]
+                # Send the full history — every tool message must stay in the
+                # context so assistant tool_use blocks keep their tool_result
+                # pair (dropping BLOCKED/Rejected messages makes providers
+                # reject the request with a 400).
+                msgs = list(session.messages)
                 response = await llm.chat(msgs, tool_defs)
                 session.total_tokens.input_tokens += response.usage.input_tokens
                 session.total_tokens.output_tokens += response.usage.output_tokens
                 session.total_tokens.total_tokens += response.usage.total_tokens
 
-                assistant_msg = Message(role="assistant", content=response.content)
+                assistant_msg = Message(
+                    role="assistant", content=response.content, tool_calls=response.tool_calls
+                )
                 session.messages.append(assistant_msg)
 
                 if response.tool_calls:
