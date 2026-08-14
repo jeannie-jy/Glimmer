@@ -11,7 +11,7 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square" alt="Python"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-22%2B-green?style=flat-square" alt="Node"></a>
   <a href="https://hub.docker.com/"><img src="https://img.shields.io/badge/docker-ready-brightgreen?style=flat-square" alt="Docker"></a>
-  <a href="#测试"><img src="https://img.shields.io/badge/tests-94%2B%20passing-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="#测试"><img src="https://img.shields.io/badge/tests-190%2B%20passing-brightgreen?style=flat-square" alt="Tests"></a>
 </p>
 
 <p align="center">
@@ -28,6 +28,7 @@
 ## 目录
 
 - [概述](#概述)
+- [功能演示](#功能演示)
 - [系统架构](#系统架构)
 - [快速开始](#快速开始)
 - [部署指南](#部署指南)
@@ -88,6 +89,28 @@ Glimmer 是一个**从零构建的生产级 AI 编程智能体 Harness**。与�
 | 多用户支持 | — | ✅ |
 | API 限流 | — | ✅ (slowapi) |
 | Nginx 反向代理 | — | ✅ |
+| 聊天附件上传 | ✅ | ✅ |
+| 会话历史（自动保存 / 加载 / 删除） | — | ✅ |
+
+---
+
+## 功能演示
+
+### 读取文件
+
+<p align="center">
+  <img src="docs/读取文件.png" alt="Agent 读取文件示例" width="800" />
+</p>
+
+用户上传或指定项目文件后，Agent 通过 `read_file` 工具**实际读取文件内容**——工具调用卡片实时展示参数（`path`、`limit`）与输出，随后 Agent 基于真实内容作答，绝不凭空猜测。
+
+### 生成文件
+
+<p align="center">
+  <img src="docs/生成文件.png" alt="Agent 生成文件示例" width="800" />
+</p>
+
+Agent 通过 `write_file` 工具**创建文件**——工具调用卡片展示写入路径与完整内容，文件实时写入工作区，并可在右侧 Files 面板中查看与下载。
 
 ---
 
@@ -162,8 +185,8 @@ Glimmer 是一个**从零构建的生产级 AI 编程智能体 Harness**。与�
 
 ```bash
 # 克隆并安装
-git clone https://github.com/jingyu-wang/lite-agent-harness.git
-cd lite-agent-harness
+git clone https://github.com/jeannie-jy/Glimmer.git
+cd Glimmer
 pip install -r requirements.txt
 
 # 启动开发服务器
@@ -222,7 +245,7 @@ make deploy
 | `OAUTH_REDIRECT_URI` | 否 | `http://localhost:8000/api/auth/callback` | OAuth 回调地址 |
 | `DOCKER_HOST` | 否 | `unix:///var/run/docker.sock` | Docker 守护进程地址 |
 | `SANDBOX_IMAGE` | 否 | `glimmer-sandbox:latest` | 沙箱容器镜像 |
-| `WORKSPACE_ROOT` | 否 | `/workspace` | 共享工作区挂载点；无 Docker 沙箱时，agent 文件操作与 Files 面板均以此为根（不设置则回退服务器 cwd） |
+| `WORKSPACE_ROOT` | 否 | 空（回退服务器 cwd） | 共享工作区挂载点；无 Docker 沙箱时，agent 文件操作与 Files 面板均以此为根。Render 部署建议设为 `/workspace`，避免暴露应用源码树 |
 | `FRONTEND_URL` | 否 | `http://localhost` | 前端 URL（用于 OAuth 重定向） |
 
 ### 手动 Docker 构建
@@ -284,8 +307,9 @@ Glimmer 使用分层配置系统，优先级从高到低：
 ```yaml
 # .harness/config.yaml
 model:
-  provider: anthropic           # "anthropic" 或 "openai"
-  model_id: claude-sonnet-5
+  provider: openai              # "anthropic" 或 "openai"（OpenAI 兼容）
+  base_url: https://api.deepseek.com   # OpenAI 兼容端点（当前部署使用 DeepSeek）
+  model_id: deepseek-v4-flash
   max_tokens: 4096
 
 guardrails:
@@ -351,7 +375,7 @@ Glimmer 采用**纵深防御**策略，三层串行检查：
 
 ### 第一层 — 路径沙箱
 
-所有文件读写操作经过路径沙箱，使用 `pathlib.resolve()` 防止路径穿越（`../../../etc/passwd`）。
+所有文件读写操作经过路径沙箱，相对路径以沙箱根目录（`WORKSPACE_ROOT` / `sandbox_root`）为基准解析，并使用 `pathlib.resolve()` 防止路径穿越（`../../../etc/passwd`）。
 
 ```python
 # 权限检查
@@ -416,9 +440,9 @@ result = sandbox.validate("/etc/passwd", "read")
 
 | 供应商 | 类型 | Base URL | 示例模型 | 备注 |
 |--------|------|----------|---------|------|
-| **Anthropic** | 原生 | 内置 | `claude-sonnet-5`、`claude-opus-4-8`、`claude-haiku-4-5` | Messages API，原生 tool-use |
+| **Anthropic** | 原生 | 内置 | `claude-opus-5`、`claude-sonnet-5`、`claude-haiku-4-5` | Messages API，原生 tool-use |
 | **OpenAI** | 原生 | 内置 | `gpt-4o`、`gpt-4.1` | Chat Completions API |
-| **DeepSeek** | 兼容 | `https://api.deepseek.com` | `deepseek-chat`、`deepseek-reasoner` | OpenAI 兼容 |
+| **DeepSeek** | 兼容 | `https://api.deepseek.com` | `deepseek-v4-flash`（当前部署）、`deepseek-chat` | OpenAI 兼容 |
 | **Qwen（通义千问）** | 兼容 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus`、`qwen-max` | OpenAI 兼容 |
 | **Ollama** | 兼容 | `http://localhost:11434/v1` | `llama3`、`mistral`、`codellama` | 本地自托管 |
 | **vLLM** | 兼容 | 自定义 | 任意 | 自托管 |
@@ -436,7 +460,7 @@ model:
 model:
   provider: openai
   base_url: https://api.deepseek.com
-  model_id: deepseek-chat
+  model_id: deepseek-v4-flash
 
 # 本地 Ollama
 model:
@@ -532,6 +556,8 @@ WebSocket 连接是 Agent 交互的主要通道，所有实时通信都通过此
 | `GET` | `/api/sessions/{id}` | Bearer | 会话详情（含消息） |
 | `DELETE` | `/api/sessions/{id}` | Bearer | 删除会话及消息 |
 
+会话在任务提交时即自动保存（状态为 `running`），任务完成后更新为 `completed`；空会话不入库。前端历史侧栏支持加载历史会话与删除（hover 垃圾桶按钮，删除当前会话时自动切换到新会话）。
+
 #### 文件
 
 | 方法 | 路径 | 鉴权 | 说明 |
@@ -595,6 +621,7 @@ WebSocket 连接是 Agent 交互的主要通道，所有实时通信都通过此
 | 图标 | Lucide React | 1400+ 一致图标 |
 | Markdown | react-markdown + remark-gfm | LLM 响应的 Markdown 渲染 |
 | 代码高亮 | react-syntax-highlighter | 代码块高亮 |
+| 测试 | Vitest + Testing Library | 时间线构建纯函数测试、组件交互测试 |
 
 ### 页面路由
 
@@ -644,14 +671,17 @@ Glimmer 为**确定性测试**而设计。每个核心机制——状态机、�
 ### 运行测试
 
 ```bash
-# 全部测试（94+ 用例）
+# 全部后端测试（190 用例）
 make test
 
-# 单元测试（82 用例，零网络依赖）
+# 单元测试（140 用例，零网络依赖）
 make test-unit
 
-# 集成测试（12 用例）
+# 集成测试（50 用例）
 make test-integration
+
+# 前端测试（vitest，5 用例）
+cd web && npm test
 
 # 可执行演示脚本
 python tests/demo/demo_guardrail.py
@@ -664,16 +694,20 @@ python tests/demo/demo_sandbox.py
 | 模块 | 用例数 | 覆盖内容 |
 |------|--------|---------|
 | 状态机 | 12 | 全部转换、非法转换报错、ERROR 通配 |
-| 路径沙箱 | 5 | 读写权限、路径穿越、符号链接攻击 |
+| 路径沙箱 | 7 | 读写权限、路径穿越、符号链接攻击、相对路径按沙箱根解析 |
 | 正则黑名单 | 5 | `rm -rf /`、`DROP TABLE`、强制推送、curl 管道、安全命令 |
-| 反馈分析器 | 6 | PASS/FAIL/UNKNOWN 判定、结构化失败提取、语法检查 |
-| 重试策略 | 4 | 次数限制、卡死检测、不同失败不卡死 |
+| 反馈分析器 | 10 | PASS/FAIL/UNKNOWN 判定、结构化失败提取、语法检查、重试策略（次数限制、卡死检测） |
 | Mock LLM | 4 | FIFO 响应、耗尽报错、调用历史、流式分块 |
 | 工具注册表 | 4 | 注册分发、未知工具、重复注册 |
-| 凭据管理器 | 10 | 掩码/状态/存储/删除周期、AES-GCM 加解密 |
-| 配置管理器 | 9 | 深度合并、规范化、优先级、列表追加 |
-| Agent 循环（集成） | 5 | 完整流程、工具使用、护栏拦截、批量调用、审批恢复 |
-| WebSocket（集成） | 6 | 连接生命周期、多轮会话 |
+| 凭据管理器 | 18 | 掩码/状态/存储/删除周期、AES-GCM 加解密、密钥解析 |
+| 配置管理器 | 20 | 深度合并、规范化、优先级、列表追加、密钥配置 |
+| 记忆管理器 | 13 | 决策与学习持久化 |
+| WS 文件/会话助手 | 33 | 文件工作区解析、会话保存状态映射、空会话跳过 |
+| Agent 循环（集成） | 8 | 完整流程、工具使用、护栏拦截、批量调用、审批恢复 |
+| WebSocket（集成） | 18 | 连接生命周期、多轮会话、文件上传时序、取消、护栏审批、会话持久化 |
+| 会话删除（集成） | 3 | DELETE 端点契约（成功 / 未知 404 / 本地模式 404） |
+| 本地模式/限流/静态（集成） | 21 | 本地鉴权、slowapi 限流、SPA 静态服务与路径穿越防护 |
+| 前端（vitest） | 5 | 多轮对话消息顺序（3）、历史会话删除交互（2） |
 
 ### Mock 驱动的测试范式
 
@@ -781,7 +815,7 @@ glimmer/
 │   └── session_registry.py           #   内存会话→容器映射表（TTL: 1h）
 ├── web/                              # React + TypeScript 前端
 │   ├── src/
-│   │   ├── components/               #   22 个 UI 组件
+│   │   ├── components/               #   29 个 UI 组件与纯逻辑模块（含 vitest 测试）
 │   │   ├── contexts/                 #   AuthContext（JWT 状态管理）
 │   │   ├── hooks/                    #   useWebSocket、useSession、useGitHubStars
 │   │   ├── pages/                    #   6 个页面
@@ -789,7 +823,7 @@ glimmer/
 │   │   └── styles/                   #   CSS：设计令牌 + 各页面/组件样式
 │   ├── package.json                  #   React、Framer Motion、Lucide、React Router
 │   └── vite.config.ts                #   开发代理 + 构建输出
-├── tests/                            # 测试套件（94+ 用例）
+├── tests/                            # 测试套件（190 后端用例 + 5 前端 vitest 用例）
 │   ├── conftest.py                   #   共享夹具
 │   ├── demo/                         #   可执行演示脚本
 │   ├── integration/                  #   集成测试
@@ -802,7 +836,7 @@ glimmer/
 ├── docker-compose.yml                # 生产部署：nginx + api + postgres
 ├── nginx.conf                        # 反向代理（WebSocket 升级）
 ├── pyinstaller.spec                  # 独立二进制打包
-├── requirements.txt                  # Python 依赖（17 个包）
+├── requirements.txt                  # Python 依赖（27 个包）
 ├── Makefile                          # 构建、测试、部署命令
 └── LICENSE                           # MIT
 ```
@@ -815,8 +849,8 @@ glimmer/
 
 ```bash
 # 1. Fork 并克隆
-git clone https://github.com/<你的用户名>/lite-agent-harness.git
-cd lite-agent-harness
+git clone https://github.com/<你的用户名>/Glimmer.git
+cd Glimmer
 
 # 2. 安装依赖
 pip install -r requirements.txt
@@ -834,6 +868,7 @@ cd web && npm run dev # 终端 2：前端（Vite HMR）
 
 # 6. 修改后跑测试
 make test
+cd web && npm test
 
 # 7. 提交并推送
 git commit -m "feat: 功能描述"
@@ -940,7 +975,7 @@ Glimmer 使用 **Fairy-Tale Dream（西方梦幻童话）** 设计系统。完�
 
 MIT License。详见 [LICENSE](LICENSE)。
 
-Copyright © 2026 [Jingyu Wang](https://github.com/jingyu-wang)。
+Copyright © 2026 [Jingyu Wang](https://github.com/jeannie-jy)。
 
 ---
 
