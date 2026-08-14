@@ -1,9 +1,9 @@
-# Glimmer
+# Glimmer — 轻量级 harness 框架 AI 编程智能体
+
 
 <p align="center">
-  <strong>轻量级、模型无关的 AI 编程智能体 — 确定性护栏、Docker 沙箱隔离、生产就绪</strong>
+  <img src="docs/主页图.png" alt="Glimmer 主页截图" />
 </p>
-
 <p align="center">
   <a href="https://github.com/jeannie-jy/Glimmer/actions"><img src="https://img.shields.io/github/actions/workflow/status/jeannie-jy/Glimmer/ci.yml?branch=main&style=flat-square" alt="CI"></a>
   <a href="https://glimmer-l5yr.onrender.com"><img src="https://img.shields.io/badge/live-demo-F8A4C8?style=flat-square" alt="Live Demo"></a>
@@ -22,9 +22,6 @@
   🌐 <strong>在线体验</strong>：<a href="https://glimmer-l5yr.onrender.com">https://glimmer-l5yr.onrender.com</a>
 </p>
 
-<p align="center">
-  <img src="docs/主页图.png" alt="Glimmer 主页截图" width="80%" />
-</p>
 
 ---
 
