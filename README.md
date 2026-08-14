@@ -282,14 +282,6 @@ pyinstaller pyinstaller.spec
 
 部署于 [Render](https://render.com) 平台，架构为 Web Service（FastAPI） + PostgreSQL（托管数据库）。
 
-所需环境变量见[上表](#环境变量)，特别注意事项：
-- `DATABASE_URL` 需将 Render 提供的 `postgres://` 改为 `postgresql+asyncpg://`
-- `OAUTH_REDIRECT_URI` 设为 `https://glimmer-l5yr.onrender.com/api/auth/callback`
-- `FRONTEND_URL` 设为 `https://glimmer-l5yr.onrender.com`
-- `WORKSPACE_ROOT` 设为 `/workspace`（Render 无 Docker socket，agent 文件操作与 Files 面板均以该目录为根，避免暴露应用源码树）
-
-**已知限制**：Windows SmartScreen / macOS Gatekeeper 首次运行可能弹窗警告。若系统未安装 ripgrep，`search_code` 会回退到 Python grep。
-
 ---
 
 ## 配置说明
@@ -788,116 +780,10 @@ assert session.tool_calls[0].name == "read_file"
 
 ---
 
-## 项目结构
-
-```
-glimmer/
-├── harness/                          # 核心智能体库
-│   ├── auth/                         #   JWT 签发/验证、GitHub OAuth、AES-256-GCM 加密
-│   ├── config/                       #   YAML 配置加载：默认→全局→项目（深度合并）
-│   ├── credentials/                  #   API Key 存储：OS 钥匙串 + 加密文件回退
-│   ├── db/                           #   PostgreSQL：异步会话、ORM 模型（User/Session/Message）
-│   │   └── migrations/               #   Alembic 迁移
-│   ├── feedback/                     #   确定性反馈：策略分发、pytest 解析器、重试策略
-│   ├── guardrails/                   #   三层护栏：路径沙箱、命令白名单、正则黑名单
-│   ├── llm/                          #   可插拔适配器：Anthropic、OpenAI、Mock（测试用）
-│   ├── memory/                       #   JSON 文件决策与学习持久化
-│   ├── sandbox/                      #   Docker 容器生命周期管理
-│   ├── tools/                        #   Agent 工具：文件操作、Shell、代码搜索、测试运行
-│   ├── loop.py                       #   AgentLoop — 状态机主协调器
-│   ├── models.py                     #   Pydantic 模型：Session、Message、ToolCall、Feedback 等
-│   └── state_machine.py              #   确定性状态转换表
-├── server/                           # FastAPI 应用服务器
-│   ├── api/                          #   REST 路由：认证、配置、会话、文件
-│   ├── static/                       #   前端构建产物（Vite 输出）
-│   ├── main.py                       #   FastAPI 应用工厂（CORS、限流、静态文件）
-│   ├── ws_handler.py                 #   WebSocket 会话处理器（JWT 鉴权、Docker 生命周期）
-│   └── session_registry.py           #   内存会话→容器映射表（TTL: 1h）
-├── web/                              # React + TypeScript 前端
-│   ├── src/
-│   │   ├── components/               #   29 个 UI 组件与纯逻辑模块（含 vitest 测试）
-│   │   ├── contexts/                 #   AuthContext（JWT 状态管理）
-│   │   ├── hooks/                    #   useWebSocket、useSession、useGitHubStars
-│   │   ├── pages/                    #   6 个页面
-│   │   ├── services/                 #   REST API 客户端
-│   │   └── styles/                   #   CSS：设计令牌 + 各页面/组件样式
-│   ├── package.json                  #   React、Framer Motion、Lucide、React Router
-│   └── vite.config.ts                #   开发代理 + 构建输出
-├── tests/                            # 测试套件（190 后端用例 + 5 前端 vitest 用例）
-│   ├── conftest.py                   #   共享夹具
-│   ├── demo/                         #   可执行演示脚本
-│   ├── integration/                  #   集成测试
-│   └── unit/                         #   隔离单元测试
-├── .github/workflows/ci.yml          # GitHub Actions CI
-├── DESIGN.md                         # 童话梦幻设计系统参考
-├── SPEC.md                           # 完整技术规约
-├── Dockerfile                        # 多阶段：Node（前端）→ Python（后端）
-├── Dockerfile.sandbox                # Agent 沙箱：Python + pytest + ripgrep + git
-├── docker-compose.yml                # 生产部署：nginx + api + postgres
-├── nginx.conf                        # 反向代理（WebSocket 升级）
-├── pyinstaller.spec                  # 独立二进制打包
-├── requirements.txt                  # Python 依赖（27 个包）
-├── Makefile                          # 构建、测试、部署命令
-└── LICENSE                           # MIT
-```
-
----
 
 ## 贡献指南
 
-### 开发工作流
-
-```bash
-# 1. Fork 并克隆
-git clone https://github.com/<你的用户名>/Glimmer.git
-cd Glimmer
-
-# 2. 安装依赖
-pip install -r requirements.txt
-cd web && npm install && cd ..
-
-# 3. 创建特性分支
-git checkout -b feature/my-feature
-
-# 4. 修改前先跑测试
-make test
-
-# 5. 开发迭代
-make dev              # 终端 1：后端
-cd web && npm run dev # 终端 2：前端（Vite HMR）
-
-# 6. 修改后跑测试
-make test
-cd web && npm test
-
-# 7. 提交并推送
-git commit -m "feat: 功能描述"
-git push origin feature/my-feature
-```
-
-### 代码规范
-
-- **Python**：必须包含类型标注。数据模型使用 Pydantic。全链路 async/await。
-- **TypeScript**：严格模式。所有 Props 类型化 。使用 CSS 变量而非硬编码颜色。
-- **测试**：新功能需要测试。使用 `MockLLMAdapter` 避免网络依赖。
-- **提交**：Conventional Commits（`feat:`、`fix:`、`docs:`、`test:`、`refactor:`、`chore:`）。
-
-### 添加工具
-
-1. 实现 `harness.tools.registry.Tool` 抽象基类
-2. 在 `_build_default_tool_registry()` 中注册
-3. 如需要，添加护栏规则（路径 + 白名单 + 正则）
-4. 如工具产生可验证的结果，添加反馈分析策略
-5. 使用 `MockLLMAdapter` 编写测试
-6. 更新本文档的[工具参考](#工具参考)
-
-### 添加 LLM Provider
-
-1. 实现 `harness.llm.adapter.LLMAdapter`
-2. 在 `harness/llm/__init__.py` 中导出
-3. 在 `_create_llm_from_config()` 中添加 Provider 检测逻辑
-4. 更新前端 `SettingsPanel.tsx` Provider 下拉菜单
-5. 更新本文档的 [LLM 供应商](#llm-供应商)
+欢迎贡献！开发环境搭建、代码规范、添加新工具与 LLM Provider 的完整流程详见 **[CONTRIBUTING.md](CONTRIBUTING.md)**。
 
 ---
 
