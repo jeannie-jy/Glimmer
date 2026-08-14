@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getSessionHistory } from '../services/api';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,6 +19,7 @@ interface HistorySidebarProps {
   activeSessionId: string;
   onSelect: (id: string) => void;
   onNewSession: () => void;
+  onDelete: (id: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,9 +47,11 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
   activeSessionId,
   onSelect,
   onNewSession,
+  onDelete,
 }) => {
   const [sessions, setSessions] = useState<HistorySession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState('');
 
   useEffect(() => {
     getSessionHistory()
@@ -60,6 +63,20 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this conversation?')) return;
+    setDeletingId(id);
+    try {
+      await onDelete(id);
+      setSessions(prev => prev.filter(s => s.id !== id));
+    } catch {
+      window.alert('Failed to delete conversation.');
+    } finally {
+      setDeletingId('');
+    }
+  };
 
   return (
     <div className="history-sidebar">
@@ -100,7 +117,19 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
               }`}
               onClick={() => onSelect(s.id)}
             >
-              <span className="history-sidebar__task">{s.task || 'Untitled session'}</span>
+              <span className="history-sidebar__task-row">
+                <span className="history-sidebar__task">{s.task || 'Untitled session'}</span>
+                <button
+                  className="history-sidebar__delete-btn"
+                  onClick={(e) => handleDelete(e, s.id)}
+                  disabled={deletingId === s.id}
+                  title="Delete conversation"
+                  aria-label="Delete conversation"
+                  type="button"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </span>
               <span className="history-sidebar__meta">
                 <span className="history-sidebar__state">{s.status || s.state || 'unknown'}</span>
                 <span className="history-sidebar__time">{formatDate(s.finished_at || s.created_at)}</span>

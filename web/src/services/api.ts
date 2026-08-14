@@ -104,3 +104,9 @@ export async function getSession(sessionId: string): Promise<LoadedSession> {
     throw new Error(`GET /api/sessions/${sessionId} failed: ${res.status}`);
   return res.json();
 }
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/sessions/${sessionId}`, { method: 'DELETE', headers: authHeaders() });
+  if (!res.ok)
+    throw new Error(`DELETE /api/sessions/${sessionId} failed: ${res.status}`);
+}

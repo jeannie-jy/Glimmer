@@ -8,7 +8,7 @@ import HistorySidebar from '../components/HistorySidebar';
 import SettingsPanel from '../components/SettingsPanel';
 import FilePanel from '../components/FilePanel';
 import GuardrailModal from '../components/GuardrailModal';
-import { getSession } from '../services/api';
+import { getSession, deleteSession } from '../services/api';
 import '../styles/agent.css';
 import { Settings, FolderOpen } from 'lucide-react';
 
@@ -33,7 +33,18 @@ const AgentPage: React.FC = () => {
   const activeSessionIdRef = useRef(activeSessionId);
   useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
   const taskSubmittedRef = useRef(false);
+  const newSessionResolvers = useRef<Array<(id: string) => void>>([]);
   const { state, pendingGuardrail, sessionId } = useSession(messages, task);
+
+  // Resolve anyone waiting for the server to confirm a fresh session
+  // (session.new round-trip) once session.created arrives.
+  useEffect(() => {
+    if (sessionId) {
+      const rs = newSessionResolvers.current;
+      newSessionResolvers.current = [];
+      rs.forEach(r => r(sessionId));
+    }
+  }, [sessionId]);
 
   useEffect(() => { if (sessionId && sessionId !== activeSessionId && historyItems.length === 0) { setActiveSessionId(sessionId); setUserMessages([]); } }, [sessionId, activeSessionId, historyItems.length]);
   useEffect(() => { if (state === 'completed' || state === 'error') setHistoryKey(k => k + 1); }, [state]);
@@ -77,6 +88,32 @@ const AgentPage: React.FC = () => {
     } catch {}
   }, [clearMessages]);
 
+  const handleDeleteSession = useCallback(async (sessionIdToDelete: string) => {
+    const wasActive = sessionIdToDelete === activeSessionIdRef.current;
+    if (wasActive) {
+      // Delete the row only AFTER switching the server to a fresh session:
+      // session.new persists the current in-memory session first, and the
+      // server upserts by session id — deleting before the switch would let
+      // the next save re-create the deleted conversation.
+      const switched = new Promise<string>((resolve) => {
+        newSessionResolvers.current.push(resolve);
+      });
+      if (isConnected) send({ type: 'session.new' });
+      await Promise.race([
+        switched,
+        new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+      ]);
+      setTask(''); setActiveSessionId(''); setHistoryItems([]); setUserMessages([]);
+      taskSubmittedRef.current = false; clearMessages();
+    }
+    try {
+      await deleteSession(sessionIdToDelete);
+      setHistoryKey(k => k + 1); // refresh the sidebar so the row stays gone
+    } catch {
+      // Keep the row on failure — the sidebar shows an alert.
+    }
+  }, [send, isConnected, clearMessages]);
+
   const handleStop = useCallback(() => { send({ type: 'session.cancel' }); }, [send]);
   const handleGuardrailApprove = useCallback(() => { send({ type: 'guardrail.approve' }); }, [send]);
   const handleGuardrailReject = useCallback(() => { send({ type: 'guardrail.reject' }); }, [send]);
@@ -94,7 +131,7 @@ const AgentPage: React.FC = () => {
     <PageTransition>
       <div className="agent-page">
         <aside className="agent-page__sidebar agent-page__sidebar--left">
-          <HistorySidebar key={historyKey} activeSessionId={activeSessionId} onSelect={handleLoadSession} onNewSession={handleNewSession} />
+          <HistorySidebar key={historyKey} activeSessionId={activeSessionId} onSelect={handleLoadSession} onNewSession={handleNewSession} onDelete={handleDeleteSession} />
         </aside>
         <main className="agent-page__main">
           <ChatView messages={messages} state={displayState} task={displayTask} onSend={handleSend} onStop={handleStop} onNewSession={handleNewSession}
