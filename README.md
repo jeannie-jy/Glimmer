@@ -22,6 +22,10 @@
   🌐 <strong>在线体验</strong>：<a href="https://glimmer-l5yr.onrender.com">https://glimmer-l5yr.onrender.com</a>
 </p>
 
+<p align="center">
+  <img src="docs/主页图.png" alt="Glimmer 主页截图" width="80%" />
+</p>
+
 ---
 
 ## 目录
