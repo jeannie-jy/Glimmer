@@ -135,6 +135,9 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: border-color var(--transition-fast);
+  /* Keep section tops clear of the fixed 56px top nav when jumping via the
+     table of contents (scrollIntoView block:'start'). */
+  scroll-margin-top: calc(56px + var(--space-4));
 }
 
 .guide-section:hover {

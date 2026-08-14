@@ -48,6 +48,11 @@ export function useSession(
       switch (msg.type) {
         case 'state.change':
           state = msg.to as AgentState;
+          // The loop left awaiting_human (approve/reject resumed it, or the
+          // guardrail was resolved some other way) — dismiss the modal.
+          if (msg.to !== 'awaiting_human') {
+            pendingGuardrail = null;
+          }
           break;
         case 'feedback.analysis':
           retryCount = msg.retry_count ?? retryCount;
@@ -62,9 +67,11 @@ export function useSession(
           break;
         case 'session.complete':
           state = 'completed';
+          pendingGuardrail = null;
           break;
         case 'session.error':
           state = 'error';
+          pendingGuardrail = null;
           break;
         case 'session.created':
           sessionId = msg.session_id;

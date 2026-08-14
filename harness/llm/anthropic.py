@@ -27,6 +27,20 @@ class AnthropicAdapter(LLMAdapter):
                         "content": m.content,
                     }]
                 })
+            elif m.role == "assistant" and m.tool_calls:
+                # Rebuild content blocks: text (if any) + tool_use blocks so
+                # the tool messages that follow keep their pair.
+                blocks: list[dict] = []
+                if m.content:
+                    blocks.append({"type": "text", "text": m.content})
+                for tc in m.tool_calls:
+                    blocks.append({
+                        "type": "tool_use",
+                        "id": tc.id,
+                        "name": tc.name,
+                        "input": tc.arguments,
+                    })
+                converted.append({"role": "assistant", "content": blocks})
             else:
                 converted.append({"role": m.role, "content": m.content})
         return converted

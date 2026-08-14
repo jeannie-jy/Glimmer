@@ -1,5 +1,4 @@
 import React from 'react';
-import React from 'react';
 import PageTransition from '../components/PageTransition';
 import HeroSection from '../components/HeroSection';
 import CardGrid from '../components/CardGrid';

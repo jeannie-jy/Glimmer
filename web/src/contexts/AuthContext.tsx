@@ -34,10 +34,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token) {
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.ok ? r.json() : null)
-        .then(u => u ? setUser(u) : (localStorage.removeItem('glimmer_token'), setToken(null)))
+        .then(u => {
+          if (u) {
+            setUser(u);
+          } else {
+            localStorage.removeItem('glimmer_token');
+            setToken(null);
+          }
+        })
+        .catch(() => {})
         .finally(() => setLoading(false));
     } else {
-      setLoading(false);
+      // Local mode: with no DATABASE_URL the backend reports {local: true}.
+      // Bypass the login wall with a synthetic local user so the Agent page
+      // is reachable under `make dev`.
+      fetch('/api/auth/mode')
+        .then(r => r.json())
+        .then(mode => {
+          if (mode.local) {
+            localStorage.setItem('glimmer_token', 'local');
+            setToken('local');
+            setUser({ id: 'local', login: 'local-user', name: 'Local Mode', avatar_url: '' });
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
     }
   }, [token]);
 

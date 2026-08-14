@@ -37,6 +37,20 @@ async def get_db():
             raise
 
 
+async def get_db_optional():
+    """FastAPI dependency: like get_db, but yields None in local mode.
+
+    Endpoints that support running without a database (single-user local
+    mode) use this so FastAPI resolves the dependency instead of raising
+    before their local-mode fallback branches can run.
+    """
+    if _get_engine() is None:
+        yield None
+        return
+    async for session in get_db():
+        yield session
+
+
 async def init_db():
     """Create all tables (called at startup)."""
     engine = _get_engine()

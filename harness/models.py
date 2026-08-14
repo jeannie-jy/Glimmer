@@ -102,6 +102,10 @@ class Message(BaseModel):
     content: str = ""
     tool_call_id: str | None = None
     tool_result: ToolResult | None = None
+    # Tool calls made by the assistant in this message (used to round-trip
+    # tool_use blocks back to providers; must stay paired with the tool
+    # messages that answer them).
+    tool_calls: list[ToolCall] = Field(default_factory=list)
 
 
 class Session(BaseModel):

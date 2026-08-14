@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 
-from harness.db.database import get_db
+from harness.db.database import get_db_optional
 from harness.db.models import User, Session
 from server.api.auth_routes import get_current_user
 
@@ -15,7 +15,7 @@ router = APIRouter(tags=["session"])
 @router.get("/sessions")
 async def list_sessions(
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Return current user's past sessions (most recent first, max 50)."""
     if not os.environ.get("DATABASE_URL"):
@@ -47,7 +47,7 @@ async def list_sessions(
 async def get_session(
     session_id: str,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Return a single session with all its messages."""
     if not os.environ.get("DATABASE_URL"):
@@ -79,7 +79,7 @@ async def get_session(
 async def delete_session(
     session_id: str,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession | None = Depends(get_db_optional),
 ):
     """Delete a session (and its messages via cascade)."""
     if not os.environ.get("DATABASE_URL"):

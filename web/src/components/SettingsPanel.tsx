@@ -41,7 +41,7 @@ const SettingsPanel: React.FC = () => {
         model_id: modelId,
         base_url: baseUrl,
       });
-      setConfig(result.config);
+      if (result.config) setConfig(result.config);
 
       // Save API key if provided
       if (apiKey.trim()) {
@@ -130,7 +130,7 @@ const SettingsPanel: React.FC = () => {
               <li key={prov} className="settings-panel__cred-item">
                 <span className="settings-panel__cred-provider">{prov}</span>
                 <span className="settings-panel__cred-status">{status}</span>
-                {status.startsWith('configured') && (
+                {status === 'set' && (
                   <button className="settings-panel__cred-delete" onClick={() => handleDeleteKey(prov)} type="button">Delete</button>
                 )}
               </li>

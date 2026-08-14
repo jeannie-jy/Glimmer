@@ -145,3 +145,81 @@ class TestAgentLoop:
         session = await loop.resume(session, mock)
         assert session.state == State.COMPLETED
         assert len(session.tool_calls) >= 1
+
+    @pytest.mark.asyncio
+    async def test_blocked_tool_message_reaches_llm_on_resume(self, tools, guardrails, analyzer, policy):
+        """After a guardrail BLOCK + approve, the BLOCKED tool message must stay
+        in the LLM context so the assistant tool_use keeps its tool_result pair."""
+        mock = MockLLMAdapter([
+            LLMResponse(
+                content="",
+                stop_reason="tool_use",
+                tool_calls=[ToolCall(
+                    id="bad1", name="execute_shell",
+                    arguments={"command": "rm -rf /"},
+                )],
+            ),
+            LLMResponse(content="Understood, I will not do that.", stop_reason="complete"),
+        ])
+        loop = AgentLoop(tools, guardrails, analyzer, policy)
+
+        session = await loop.run("Clean up", mock)
+        assert session.state == State.AWAITING_HUMAN
+
+        session = loop.approve_pending(session)
+        session = await loop.resume(session, mock)
+        assert session.state == State.COMPLETED
+
+        second_call_messages = mock.call_history[1]["messages"]
+        blocked = [m for m in second_call_messages if m.role == "tool" and m.content.startswith("BLOCKED")]
+        assert blocked, "BLOCKED tool message must be passed to the LLM to pair with its tool_use"
+        assert blocked[0].tool_call_id == "bad1"
+
+    @pytest.mark.asyncio
+    async def test_rejected_tool_message_reaches_llm_on_resume(self, tools, guardrails, analyzer, policy):
+        """After a guardrail REJECT, the Rejected tool message must stay in the
+        LLM context so the assistant tool_use keeps its tool_result pair."""
+        mock = MockLLMAdapter([
+            LLMResponse(
+                content="",
+                stop_reason="tool_use",
+                tool_calls=[ToolCall(
+                    id="t1", name="execute_shell",
+                    arguments={"command": "unknown_cmd_xyz"},
+                )],
+            ),
+            LLMResponse(content="OK, skipping that command.", stop_reason="complete"),
+        ])
+        loop = AgentLoop(tools, guardrails, analyzer, policy)
+
+        session = await loop.run("Do something", mock)
+        assert session.state == State.AWAITING_HUMAN
+
+        session = loop.reject_pending(session)
+        session = await loop.resume(session, mock)
+        assert session.state == State.COMPLETED
+
+        second_call_messages = mock.call_history[1]["messages"]
+        rejected = [m for m in second_call_messages if m.role == "tool" and m.content.startswith("Rejected")]
+        assert rejected, "Rejected tool message must be passed to the LLM to pair with its tool_use"
+        assert rejected[0].tool_call_id == "t1"
+
+    @pytest.mark.asyncio
+    async def test_assistant_message_persists_tool_calls(self, tools, guardrails, analyzer, policy):
+        """Assistant messages with tool_use must carry their tool_calls so
+        adapters can round-trip the conversation to real providers."""
+        mock = MockLLMAdapter([
+            LLMResponse(
+                content="Let me run the tests.",
+                stop_reason="tool_use",
+                tool_calls=[ToolCall(id="t1", name="execute_shell", arguments={"command": "echo ok"})],
+            ),
+            LLMResponse(content="Done.", stop_reason="complete"),
+        ])
+        loop = AgentLoop(tools, guardrails, analyzer, policy)
+
+        session = await loop.run("Run tests", mock)
+
+        assistant_msgs = [m for m in session.messages if m.role == "assistant" and m.tool_calls]
+        assert len(assistant_msgs) == 1
+        assert assistant_msgs[0].tool_calls[0].id == "t1"

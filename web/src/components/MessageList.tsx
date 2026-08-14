@@ -56,7 +56,7 @@ function buildDisplayItems(
       const state = msg.to;
       if (!['idle', 'completed', 'error'].includes(state)) {
         let toolName: string | undefined;
-        if (state === 'executing') { let k = i + 1; while (k < messages.length) { if (messages[k].type === 'tool.invoke') { toolName = messages[k].tool; break; } if (messages[k].type === 'state.change') break; k++; } }
+        if (state === 'executing') { let k = i + 1; while (k < messages.length) { const m = messages[k]; if (m.type === 'tool.invoke') { toolName = m.tool; break; } if (m.type === 'state.change') break; k++; } }
         let isActive = agentState === state;
         const so = ['idle','planning','executing','observing','correcting'];
         const ci = so.indexOf(agentState), ti = so.indexOf(state);
