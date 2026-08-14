@@ -54,13 +54,13 @@ def configure(
         app.state.ws_llm_override = llm_override
 
 
-def _build_default_tool_registry(docker_mgr=None, container_id=None) -> ToolRegistry:
+def _build_default_tool_registry(docker_mgr=None, container_id=None, workspace_root: Path | None = None) -> ToolRegistry:
     registry = ToolRegistry()
-    registry.register(ReadFileTool(docker_mgr=docker_mgr, container_id=container_id))
-    registry.register(WriteFileTool(docker_mgr=docker_mgr, container_id=container_id))
-    registry.register(ExecuteShellTool(docker_mgr=docker_mgr, container_id=container_id))
-    registry.register(RunTestsTool(docker_mgr=docker_mgr, container_id=container_id))
-    registry.register(SearchCodeTool(docker_mgr=docker_mgr, container_id=container_id))
+    registry.register(ReadFileTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root))
+    registry.register(WriteFileTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root))
+    registry.register(ExecuteShellTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
+    registry.register(RunTestsTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
+    registry.register(SearchCodeTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
     return registry
 
 
@@ -219,17 +219,46 @@ async def _load_session_from_db(
 
 # Directories excluded from local-mode file listings: harness internals and
 # dependency trees, not agent workspace files.
-_LOCAL_SKIP_DIRS = {".git", ".harness", ".claude", "node_modules", "__pycache__", ".venv", "venv"}
+_LOCAL_SKIP_DIRS = {
+    ".git", ".harness", ".claude", "node_modules", "__pycache__", ".venv", "venv",
+    # The application's own source tree — when the workspace root falls back
+    # to the server cwd (no WORKSPACE_ROOT set), these are server internals,
+    # not agent workspace files.
+    "harness", "server", "web", "tests", "docs",
+    ".github", ".agents", ".superpowers", ".pytest_cache", "dist", "build",
+}
+
+# Sensitive files that must never appear in file listings regardless of
+# workspace root (defense in depth).
+_LOCAL_SKIP_FILES = {".env", ".env.example"}
+_LOCAL_SKIP_SUFFIXES = (".key", ".pem")
+
+
+def _workspace_root() -> Path:
+    """Root directory for local-mode agent file operations.
+
+    WORKSPACE_ROOT (when set) points agent file operations at a dedicated
+    workspace directory — e.g. ``/workspace`` on deployed servers without a
+    Docker socket, where the server cwd is the application source tree and
+    must not be exposed as the agent's workspace. Falls back to the server
+    cwd for local development.
+    """
+    env_root = os.environ.get("WORKSPACE_ROOT")
+    if env_root:
+        root = Path(env_root)
+        root.mkdir(parents=True, exist_ok=True)
+        return root.resolve()
+    return Path.cwd().resolve()
 
 
 def _safe_local_path(rel: str) -> Path | None:
     """Resolve a client-supplied relative path under the local workspace.
 
     Returns None when the path escapes the workspace (traversal or absolute).
-    The workspace is the server's cwd — the same root the local-mode tools
-    (read_file / write_file / execute_shell) operate on.
+    The workspace is the WORKSPACE_ROOT directory (or the server's cwd when
+    unset) — the same root the local-mode tools operate on.
     """
-    root = Path.cwd().resolve()
+    root = _workspace_root()
     # Absolute-looking paths (posix "/x", windows "C:\\x", UNC "\\\\x") are
     # never valid workspace-relative paths — reject before resolving.
     if rel.startswith(("/", "\\")) or Path(rel).is_absolute() or (len(rel) > 1 and rel[1] == ":"):
@@ -242,13 +271,15 @@ def _safe_local_path(rel: str) -> Path | None:
 
 def _list_local_files() -> list[dict]:
     """List agent workspace files in local mode (same shape as files.list)."""
-    root = Path.cwd().resolve()
+    root = _workspace_root()
     files = []
     for p in sorted(root.rglob("*")):
         if not p.is_file() or p.is_symlink():
             continue
         rel = p.relative_to(root)
         if any(part in _LOCAL_SKIP_DIRS for part in rel.parts):
+            continue
+        if rel.name in _LOCAL_SKIP_FILES or rel.name.endswith(_LOCAL_SKIP_SUFFIXES):
             continue
         try:
             st = p.stat()
@@ -552,9 +583,15 @@ async def websocket_session(websocket: WebSocket) -> None:
     def _build_components():
         tools = getattr(app_state, 'ws_tool_registry', None)
         if tools is None:
-            tools = _build_default_tool_registry(docker_mgr=docker_mgr, container_id=container_id)
+            tools = _build_default_tool_registry(docker_mgr=docker_mgr, container_id=container_id,
+                                                 workspace_root=_workspace_root())
+        # WORKSPACE_ROOT (when set) pins the agent's file operations to the
+        # dedicated workspace directory instead of the server cwd — without
+        # it, deployed servers without a Docker socket would expose their
+        # source tree as the agent workspace.
+        sandbox_root = str(_workspace_root()) if os.environ.get("WORKSPACE_ROOT") else config.sandbox_root
         guardrails = GuardrailEngine(
-            sandbox_root=config.sandbox_root,
+            sandbox_root=sandbox_root,
             whitelist_extra=config.command_whitelist_extra,
         )
         analyzer = FeedbackAnalyzer()
