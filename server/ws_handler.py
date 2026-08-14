@@ -114,6 +114,28 @@ def _db_payload_to_message(role: str, payload: dict | None) -> PydanticMessage:
     )
 
 
+def _session_has_content(harness_session: PydanticSession) -> bool:
+    """True when the session is worth persisting.
+
+    A submitted task counts even before the loop appends the user message
+    (auto-save on submit). System prompts alone never make a session worth
+    keeping — this prevents empty "Untitled session" rows from landing in
+    the history sidebar when a client clicks "new session" on a fresh chat.
+    """
+    if harness_session.task:
+        return True
+    return any(m.role in ("user", "assistant") for m in harness_session.messages)
+
+
+def _session_status(state_value: str) -> str:
+    """Map a harness session state to the history-sidebar status string."""
+    if state_value in ("completed", "awaiting_human"):
+        return "completed"
+    if state_value == "error":
+        return "error"
+    return "running"
+
+
 async def _save_session_to_db(
     harness_session: PydanticSession,
     user_id: str,
@@ -121,6 +143,8 @@ async def _save_session_to_db(
     db_session_factory,
 ) -> None:
     """Persist the harness session and its messages to the database."""
+    if not _session_has_content(harness_session):
+        return
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
     from harness.db.database import _get_engine
 
@@ -130,7 +154,7 @@ async def _save_session_to_db(
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as db_s:
         try:
-            status = "completed" if harness_session.state.value in ("completed", "awaiting_human") else "error"
+            status = _session_status(harness_session.state.value)
             result = await db_s.execute(
                 select(DBSession).where(DBSession.id == uuid.UUID(harness_session.id))
             )
@@ -809,6 +833,9 @@ async def websocket_session(websocket: WebSocket) -> None:
                 if loaded is not None:
                     harness_session = loaded
                     await emit_to_ws("session.created", session_id=harness_session.id)
+            # Auto-save on submit: keeps the conversation in history even if
+            # the page is refreshed mid-turn.
+            await _save_and_notify()
             result, buffered = await run_task_pumped(task_text)
             if result is None:
                 # Error or cancellation — the loop stays open for re-submit
@@ -935,6 +962,9 @@ async def websocket_session(websocket: WebSocket) -> None:
     if task_content:
         if is_resuming:
             await emit_to_ws("session.created", session_id=harness_session.id)
+        # Auto-save on submit (ChatGPT-style): the conversation appears in
+        # the history sidebar from the first message, not only on completion.
+        await _save_and_notify()
         try:
             result, buffered = await run_task_pumped(task_content)
         except WebSocketDisconnect:

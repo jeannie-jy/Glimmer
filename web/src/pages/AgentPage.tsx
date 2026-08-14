@@ -37,6 +37,10 @@ const AgentPage: React.FC = () => {
 
   useEffect(() => { if (sessionId && sessionId !== activeSessionId && historyItems.length === 0) { setActiveSessionId(sessionId); setUserMessages([]); } }, [sessionId, activeSessionId, historyItems.length]);
   useEffect(() => { if (state === 'completed' || state === 'error') setHistoryKey(k => k + 1); }, [state]);
+  // A new session was created on the server (bootstrap or "+" new chat) —
+  // the previous conversation was persisted just before session.created was
+  // emitted, so refresh the history sidebar to show it (ChatGPT-style).
+  useEffect(() => { if (sessionId) setHistoryKey(k => k + 1); }, [sessionId]);
   useEffect(() => { if (wsError) { const t = setTimeout(() => clearError(), 3000); return () => clearTimeout(t); } }, [wsError, clearError]);
   useEffect(() => { connect(); return () => { disconnect(); }; }, []); // eslint-disable-line
 
