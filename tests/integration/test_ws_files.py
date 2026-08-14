@@ -10,7 +10,7 @@ import base64
 from fastapi.testclient import TestClient
 
 from harness.llm.mock import MockLLMAdapter
-from harness.models import LLMResponse, TokenUsage
+from harness.models import LLMResponse, TokenUsage, ToolCall
 from server.main import create_app
 from server.ws_handler import configure
 
@@ -24,7 +24,7 @@ def _ok_response(text: str) -> LLMResponse:
     )
 
 
-def _make_client(workspace, monkeypatch) -> TestClient:
+def _make_client(workspace, monkeypatch, responses=None) -> TestClient:
     """Local-mode app with a mock LLM so the WS loop can run a turn.
 
     ``workspace`` is the directory the server's cwd is pointed at — the root
@@ -33,7 +33,9 @@ def _make_client(workspace, monkeypatch) -> TestClient:
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.chdir(workspace)
     app = create_app(project_root=workspace)
-    configure(app, llm_override=MockLLMAdapter([_ok_response("All done.")]))
+    if responses is None:
+        responses = [_ok_response("All done.")]
+    configure(app, llm_override=MockLLMAdapter(responses))
     return TestClient(app)
 
 
@@ -93,6 +95,39 @@ def test_local_mode_file_roundtrip_via_ws(tmp_path, monkeypatch):
         msg = _receive_until(ws, "files.deleted")
         assert msg["path"] == "notes/hello.txt"
         assert not (tmp_path / "notes" / "hello.txt").exists()
+
+
+def test_upload_before_first_task_visible_to_agent_turn(tmp_path, monkeypatch):
+    """Regression: the frontend sends files.upload before task.submit; the
+    bootstrap loop deferred those uploads past the first turn, so an agent
+    asked to read an uploaded file in its first turn found nothing on disk
+    (No such file or directory). The upload must land before the turn runs."""
+    responses = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(id="t1", name="read_file", arguments={"path": "notes/hello.txt"})
+            ],
+            stop_reason="tool_use",
+        ),
+        _ok_response("read done"),
+    ]
+    client = _make_client(tmp_path, monkeypatch, responses)
+    with client.websocket_connect("/ws/session") as ws:
+        # Frontend order: attachment uploads first, then the task
+        ws.send_json({
+            "type": "files.upload",
+            "path": "notes/hello.txt",
+            "content": base64.b64encode(b"hello file").decode(),
+        })
+        ws.send_json({"type": "task.submit", "content": "read the uploaded file"})
+        seen = _drain(ws)
+        assert any(m.get("type") in ("session.complete", "session.error") for m in seen), seen
+
+        results = [m for m in seen if m.get("type") == "tool.result" and m.get("tool_name") == "read_file"]
+        assert results, seen
+        assert results[0]["exit_code"] == 0, results[0]
+        assert "hello file" in results[0]["stdout"], results[0]
 
 
 def test_upload_path_traversal_rejected(tmp_path, monkeypatch):

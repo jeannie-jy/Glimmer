@@ -922,6 +922,15 @@ async def websocket_session(websocket: WebSocket) -> None:
             # pump; if received here (outside a turn), ignore silently
             pass
 
+    # ---- Replay messages deferred during bootstrap (files.upload etc.) ----
+    # The frontend sends attachment uploads before task.submit; they must land
+    # in the workspace before the first turn runs, or the agent's read of the
+    # just-uploaded file fails with "No such file or directory".
+    for d in deferred:
+        print(f"[WS] Replaying deferred: {d.get('type', '')}")
+        await handle_message(d)
+
+    buffered: list[dict] = []
     # ---- First task (from bootstrap) ----
     if task_content:
         if is_resuming:
@@ -940,7 +949,6 @@ async def websocket_session(websocket: WebSocket) -> None:
             # Cancelled first turn — keep the session open for re-submit
         else:
             await _save_and_notify()
-        deferred.extend(buffered)
     else:
         # No initial task (loaded session without submit) — send created event
         if harness_session.state == State.IDLE:
@@ -948,11 +956,12 @@ async def websocket_session(websocket: WebSocket) -> None:
         elif len(harness_session.messages) > 0:
             await emit_to_ws("session.created", session_id=harness_session.id)
 
-    # ---- Main message loop ----
-    # Replay messages collected during bootstrap wait and the first turn
-    for d in deferred:
-        print(f"[WS] Replaying deferred: {d.get('type', '')}")
+    # ---- Replay messages buffered during the first turn ----
+    for d in buffered:
+        print(f"[WS] Replaying buffered: {d.get('type', '')}")
         await handle_message(d)
+
+    # ---- Main message loop ----
 
     try:
         while True:
