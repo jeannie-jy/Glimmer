@@ -7,12 +7,20 @@ from harness.tools.git_ops import GitTool
 
 
 class FakeDocker:
-    def __init__(self):
+    def __init__(self, exit_code=0, stdout="", stderr=""):
         self.calls: list[str] = []
+        self.exit_code = exit_code
+        self.stdout = stdout
+        self.stderr = stderr
 
     async def exec(self, container_id, cmd, timeout=10):
         self.calls.append(cmd)
-        return SimpleNamespace(exit_code=0, stdout="", stderr="")
+        return SimpleNamespace(exit_code=self.exit_code, stdout=self.stdout, stderr=self.stderr)
+
+
+class RaisingDocker:
+    async def exec(self, container_id, cmd, timeout=10):
+        raise RuntimeError("container gone")
 
 
 def test_unknown_subcommand_rejected():
@@ -50,3 +58,30 @@ def test_docker_mode_uses_container_git():
     result = asyncio.run(tool.execute({"subcommand": "diff"}))
     assert any(call.startswith("git -C /workspace") for call in docker.calls)
     assert result.exit_code == 0
+
+
+def test_docker_mode_exit_1_forwards_error_not_success():
+    docker = FakeDocker(exit_code=1, stdout="", stderr="boom")
+    tool = GitTool(docker_mgr=docker, container_id="c1")
+    result = asyncio.run(tool.execute({"subcommand": "diff"}))
+    assert result.exit_code == 1
+    assert result.stderr == "boom"
+    assert result.structured is None
+
+
+def test_local_mode_exit_1_forwards_error_not_success(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "harness.tools.git_ops.subprocess.run",
+        lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="boom"),
+    )
+    tool = GitTool(cwd=tmp_path)
+    result = asyncio.run(tool.execute({"subcommand": "diff"}))
+    assert result.exit_code == 1
+    assert result.structured is None
+
+
+def test_docker_exec_exception_becomes_clean_error():
+    tool = GitTool(docker_mgr=RaisingDocker(), container_id="c1")
+    result = asyncio.run(tool.execute({"subcommand": "diff"}))
+    assert result.exit_code == 1
+    assert "container gone" in result.stderr

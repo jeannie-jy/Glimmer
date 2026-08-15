@@ -54,8 +54,12 @@ class GitTool(Tool):
             clean = (path or "").replace("\\", "/").lstrip("/")
             repo = "/workspace" + (f"/{clean}" if clean else "")
             cmd = f"git -C {shlex.quote(repo)} {' '.join(_READ_ONLY[sub])}"
-            result = await self._docker_mgr.exec(self._container_id, cmd, timeout=30)
-            return await self._build_result(sub, result.exit_code, result.stdout, result.stderr, repo, start)
+            try:
+                result = await self._docker_mgr.exec(self._container_id, cmd, timeout=30)
+                return await self._build_result(sub, result.exit_code, result.stdout, result.stderr, repo, start)
+            except Exception as e:
+                return ToolResult(tool_name="git", exit_code=1, stdout="", stderr=str(e),
+                    duration_ms=int((time.time() - start) * 1000))
 
         cwd = (self._cwd or Path.cwd()).resolve()
         repo = str(cwd / path) if path else str(cwd)
@@ -76,6 +80,9 @@ class GitTool(Tool):
                 duration_ms=int((time.time() - start) * 1000))
         if code not in (0, 1):
             return ToolResult(tool_name="git", exit_code=code, stdout=stdout, stderr=stderr,
+                duration_ms=int((time.time() - start) * 1000))
+        if code == 1:
+            return ToolResult(tool_name="git", exit_code=1, stdout=stdout, stderr=stderr,
                 duration_ms=int((time.time() - start) * 1000))
 
         structured = None
