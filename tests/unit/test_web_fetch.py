@@ -115,6 +115,73 @@ def test_non_text_content_type_rejected(monkeypatch):
     assert "Content type" in result.stderr
 
 
+def test_html_stdout_extracts_title_description_and_visible_text(monkeypatch):
+    html = (
+        "<!DOCTYPE html><html><head>"
+        "<title>Example Site</title>"
+        '<meta name="description" content="A site about examples">'
+        "<style>body{color:red}</style>"
+        "</head><body>"
+        "<script>var x = 1;</script>"
+        "<h1>Welcome</h1><p>Real page content here.</p>"
+        "</body></html>"
+    )
+
+    class HtmlClient(FakeClient):
+        def _make_response(self, url):
+            return FakeStreamResponse(headers={"content-type": "text/html; charset=utf-8"},
+                                      body=html.encode(), url=url)
+
+    monkeypatch.setattr(web_fetch.httpx, "AsyncClient", HtmlClient)
+    tool = web_fetch.WebFetchTool()
+    result = asyncio.run(tool.execute({"url": "https://example.com/"}))
+
+    assert result.exit_code == 0
+    assert "Title: Example Site" in result.stdout
+    assert "Description: A site about examples" in result.stdout
+    assert "Real page content here." in result.stdout
+    assert "body{color:red}" not in result.stdout  # style stripped
+    assert "var x = 1" not in result.stdout  # script stripped
+
+
+def test_html_stdout_skips_hidden_and_aria_hidden_content(monkeypatch):
+    html = (
+        "<html><head><title>T</title></head><body>"
+        "<p>Visible text.</p>"
+        "<div hidden><p>Hidden placeholder error text.</p></div>"
+        '<div aria-hidden="true"><p>Decorative text.</p></div>'
+        "</body></html>"
+    )
+
+    class HtmlClient(FakeClient):
+        def _make_response(self, url):
+            return FakeStreamResponse(headers={"content-type": "text/html"},
+                                      body=html.encode(), url=url)
+
+    monkeypatch.setattr(web_fetch.httpx, "AsyncClient", HtmlClient)
+    tool = web_fetch.WebFetchTool()
+    result = asyncio.run(tool.execute({"url": "https://example.com/"}))
+
+    assert result.exit_code == 0
+    assert "Visible text." in result.stdout
+    assert "Hidden placeholder error text." not in result.stdout
+    assert "Decorative text." not in result.stdout
+
+
+def test_non_html_stdout_stays_raw(monkeypatch):
+    class JsonClient(FakeClient):
+        def _make_response(self, url):
+            return FakeStreamResponse(headers={"content-type": "application/json"},
+                                      body=b'{"ok": true}', url=url)
+
+    monkeypatch.setattr(web_fetch.httpx, "AsyncClient", JsonClient)
+    tool = web_fetch.WebFetchTool()
+    result = asyncio.run(tool.execute({"url": "https://example.com/api"}))
+
+    assert result.exit_code == 0
+    assert '{"ok": true}' in result.stdout
+
+
 def test_oversized_body_truncated_at_cap_without_unbounded_read(monkeypatch):
     # 1000 bytes past the cap — must be truncated, and the fake transport
     # must never be asked to deliver more than MAX_BYTES + 1 bytes.
