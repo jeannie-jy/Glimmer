@@ -315,6 +315,10 @@ tools:
     - execute_shell
     - run_tests
     - search_code
+    - list_files
+    - restore_file
+    - git
+    - web_fetch
 
 memory:
   max_context_tokens: 8000      # LLM 上下文窗口最大 Token 数
@@ -472,6 +476,21 @@ model:
 | `execute_shell` | 在沙箱中执行命令 | `command`、`cwd?` | 30s |
 | `run_tests` | 运行 pytest 并收集结构化结果 | `path?`（默认 `tests/`） | 60s |
 | `search_code` | ripgrep 搜索（Python 回退） | `pattern`、`path?`、`glob?` | 15s |
+
+#### 2026-08 新增工具
+
+| 工具 | 说明 | 关键参数 |
+|---|---|---|
+| `list_files` | 浏览工作区目录结构（有界深度，自动跳过 node_modules 等依赖目录） | `path`、`max_depth` |
+| `restore_file` | 回滚文件到最近一次 `write_file` 覆盖前的内容（快照店在工作区之外，agent 不可见） | `path` |
+| `git` | 只读 git 三件套：`status`（结构化）、`diff HEAD`、`log`（最近 20 条） | `subcommand`、`path` |
+| `web_fetch` | 抓取公网网页文本（≤512KB，仅 http(s) 80/443；私网/云元数据地址硬封锁） | `url` |
+
+安全说明：
+
+- **secret scan（护栏第四层）**：`write_file` 内容与 `execute_shell` 命令中的高置信密钥模式（私钥、AWS/GitHub/Anthropic/OpenAI token、JWT）会触发人工确认弹窗（ASK_HUMAN），可放行或拒绝。
+- **egress 护栏**：`execute_shell` 命令中的内网/回环/云元数据 URL 一律 BLOCK；`web_fetch` 每个重定向跳转均重新校验。
+- **快照回滚**：Render 免费层主机文件系统是临时的——跨部署快照会丢失，会话内回滚不受影响。
 
 ### 自定义工具
 

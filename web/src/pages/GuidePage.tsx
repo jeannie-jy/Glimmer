@@ -281,6 +281,10 @@ memory:
             { task: '修复 tests/test_login.py 中的失败测试', desc: 'Agent 会用 read_file 读代码 → 分析 → write_file 修复 → run_tests 验证', tags: ['调试', '自修正'] },
             { task: '在代码库中搜索所有 SQL 注入风险', desc: 'Agent 会用 search_code 搜索危险模式，然后报告发现', tags: ['代码分析', '安全审计'] },
             { task: '为 src/utils.py 编写单元测试', desc: 'Agent 会先读代码理解逻辑，再创建测试文件并验证', tags: ['测试生成', '代码理解'] },
+            { task: '浏览项目结构', desc: '让 Agent 先 list_files 再读文件，避免盲猜路径', tags: ['文件浏览'] },
+            { task: '改坏了想回滚', desc: '直接说「用 restore_file 恢复 xxx」，快照在每次 write_file 覆盖前自动保存', tags: ['快照回滚'] },
+            { task: '查文档', desc: 'Agent 可用 web_fetch 抓取公开文档页（内网地址与云元数据被硬封锁）', tags: ['联网查文档'] },
+            { task: '查看改动', desc: '让 Agent 运行 git status / git diff 汇报修改', tags: ['版本控制'] },
           ].map((ex, i) => (
             <div key={i} className="guide-example-card">
               <div className="guide-example-card__task">

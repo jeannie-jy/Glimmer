@@ -91,6 +91,17 @@ class GuardrailEngine:
         return GuardResult(action=ALLOW, layer=0)`,
   },
   {
+    id: 'security-additions',
+    icon: <Shield size={22} />,
+    title: '安全新防线',
+    summary: '护栏第四层 secret scan + egress 网络封锁 + 快照回滚——密钥泄露与 SSRF 的纵深防护',
+    details: [
+      'SSRF 防护：web_fetch 与 execute_shell 的出口 URL 都要过 netguard——DNS 解析后封锁私网（10/8、172.16/12、192.168/16）、回环、链路本地与云元数据地址（169.254.169.254），且每个重定向跳转重新校验',
+      '快照回滚：快照店位于 agent 可达范围之外（~/.harness/snapshots 或 Docker 主机侧目录），write_file 覆盖前自动保存原内容，restore_file 取最新快照写回',
+      'secret scan：高置信密钥模式触发 ASK_HUMAN 确认，误报代价只是一次点击',
+    ],
+  },
+  {
     id: 'feedback',
     icon: <BarChart3 size={22} />,
     title: '确定性反馈闭环',

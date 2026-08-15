@@ -66,7 +66,9 @@ const ARCH_LAYERS = [
   {
     label: 'Agent Core',
     color: '#d4859e',
-    items: ['确定性状态机 (8 态)', '三层护栏引擎', '5 内置工具 + 自定义扩展', 'LLM 适配器 (Anthropic/OpenAI/Mock)'],
+    items: ['确定性状态机 (8 态)', '三层护栏引擎', '9 内置工具 + 自定义扩展', 'LLM 适配器 (Anthropic/OpenAI/Mock)',
+      '新工具集：list_files 目录浏览 / restore_file 快照回滚 / git 只读检查 / web_fetch 联网查文档（SSRF 防护）',
+      '护栏第四层：secret scan 敏感信息拦截（人工确认）+ execute_shell 内网地址硬封锁'],
   },
   {
     label: 'Infrastructure',
@@ -469,7 +471,7 @@ const AboutPage: React.FC = () => (
           {[
             { value: '8', label: 'Agent 状态' },
             { value: '3', label: '护栏层' },
-            { value: '5', label: '内置工具' },
+            { value: '9', label: '内置工具' },
             { value: '7+', label: 'LLM 供应商' },
             { value: '94+', label: '测试用例' },
             { value: '6', label: '前端页面' },
