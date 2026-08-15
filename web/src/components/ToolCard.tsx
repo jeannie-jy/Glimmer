@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Search, FileText, Terminal, FlaskConical } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Search, FileText, Terminal, FlaskConical, Play, Check, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface TestFailure { file: string; line?: number; function?: string; message: string; }
 interface TestStructured { passed: number; failed: number; errors: number; failures: TestFailure[]; }
@@ -42,12 +42,12 @@ const ToolCard: React.FC<ToolCardProps> = ({ toolName, args, exitCode, stdout, s
   return (
     <div className={`tool-card ${expanded ? 'tool-card--expanded' : ''}`}>
       <button className="tool-card__header" onClick={() => setExpanded(!expanded)} type="button">
-        <span className={`tool-card__icon tool-card__icon--${statusMod}`}>{status === 'invoked' ? '▶' : isSuccess ? '✓' : '✗'}</span>
+        <span className={`tool-card__icon tool-card__icon--${statusMod}`}>{status === 'invoked' ? <Play size={14} /> : isSuccess ? <Check size={14} /> : <X size={14} />}</span>
         <span className="tool-card__icon-label">{icon}</span>
         <span className="tool-card__name">{label}</span>
         {durationMs !== undefined && <span className="tool-card__duration">{(durationMs / 1000).toFixed(1)}s</span>}
         <span className={`tool-card__status tool-card__status--${statusMod}`}>{status === 'invoked' ? 'Running...' : `Exit ${exitCode}`}</span>
-        <span className="tool-card__expand">{expanded ? '▲' : '▼'}</span>
+        <span className="tool-card__expand">{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
       </button>
       {expanded && (
         <div className="tool-card__body">

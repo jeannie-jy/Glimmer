@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Paperclip, X, Send, AlertTriangle } from 'lucide-react';
+import { Paperclip, X, Send, AlertTriangle, File } from 'lucide-react';
 
 const MAX_FILE_SIZE = 95 * 1024;
 
@@ -59,7 +59,7 @@ const InputBar: React.FC<InputBarProps> = ({ onSend, onStop, disabled, isRunning
   return (
     <form className="input-bar" onSubmit={handleSubmit}>
       {files.length > 0 && (<div className="input-bar__chips">{files.map((f, i) => (
-        <span key={i} className="input-bar__chip"><span className="input-bar__chip-icon">📄</span><span className="input-bar__chip-name">{f.name}</span><span className="input-bar__chip-size">{formatSize(f.size)}</span><button className="input-bar__chip-close" onClick={() => removeFile(i)} type="button"><X size={12} /></button></span>
+        <span key={i} className="input-bar__chip"><span className="input-bar__chip-icon"><File size={12} /></span><span className="input-bar__chip-name">{f.name}</span><span className="input-bar__chip-size">{formatSize(f.size)}</span><button className="input-bar__chip-close" onClick={() => removeFile(i)} type="button"><X size={12} /></button></span>
       ))}</div>)}
       {sizeError && (<div className="input-bar__size-error"><AlertTriangle size={14} /> {sizeError}</div>)}
       <div className="input-bar__container">

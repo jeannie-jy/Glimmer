@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { File } from 'lucide-react';
 import type { WsServerMessage } from '../hooks/useWebSocket';
 import type { AgentState } from '../hooks/useSession';
 import { buildDisplayItems, parseUploadedFiles, type DisplayItem } from './messageTimeline';
@@ -27,7 +28,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, task, agentState, h
 
   const renderItem = (item: DisplayItem) => {
     switch (item.kind) {
-      case 'user': { const d = item.data as { content: string; files?: Array<{name: string; size: number}> }; const parsed = parseUploadedFiles(d.content); const df = d.files && d.files.length > 0 ? d.files : parsed.files; const dc = parsed.cleanText || d.content; return (<>{df && df.length > 0 && (<div className="message-list__attachments">{df.map((f,i)=>(<span key={i} className="message-list__attachments-chip"><span className="message-list__attachments-icon">📄</span><span className="message-list__attachments-name">{f.name}</span><span className="message-list__attachments-size">{f.size<1024?`${f.size}B`:f.size<1048576?`${(f.size/1024).toFixed(1)}KB`:`${(f.size/1048576).toFixed(1)}MB`}</span></span>))}</div>)}<UserBubble content={dc} /></>); }
+      case 'user': { const d = item.data as { content: string; files?: Array<{name: string; size: number}> }; const parsed = parseUploadedFiles(d.content); const df = d.files && d.files.length > 0 ? d.files : parsed.files; const dc = parsed.cleanText || d.content; return (<>{df && df.length > 0 && (<div className="message-list__attachments">{df.map((f,i)=>(<span key={i} className="message-list__attachments-chip"><span className="message-list__attachments-icon"><File size={14} /></span><span className="message-list__attachments-name">{f.name}</span><span className="message-list__attachments-size">{f.size<1024?`${f.size}B`:f.size<1048576?`${(f.size/1024).toFixed(1)}KB`:`${(f.size/1048576).toFixed(1)}MB`}</span></span>))}</div>)}<UserBubble content={dc} /></>); }
       case 'state': { const d = item.data as { state: string; from?: string; toolName?: string; isActive: boolean }; return <StateChip state={d.state} toolName={d.toolName} isActive={d.isActive} />; }
       case 'llm': { const d = item.data as { content: string; isStreaming: boolean }; return <TextBubble content={d.content} isStreaming={d.isStreaming} />; }
       case 'tool': { const d = item.data as any; return <ToolCard toolName={d.toolName} args={d.args} exitCode={d.exitCode} stdout={d.stdout} stderr={d.stderr} durationMs={d.durationMs} structured={d.structured} status={d.status} />; }

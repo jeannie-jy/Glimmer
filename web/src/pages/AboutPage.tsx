@@ -6,7 +6,7 @@ import {
   Wand2, Brain, Shield, BarChart3, Cpu, Layers,
   Workflow, GitBranch, Lock, Zap, Server, Palette,
   Box, Terminal, Network, Code2, FileCode, TestTube,
-  Database, Container, Globe, Package
+  Database, Container, Globe, Package, Heart
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -491,7 +491,7 @@ const AboutPage: React.FC = () => (
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
       >
-        <p>Built with ❤️ using Python, FastAPI, React, and a love for deterministic software.</p>
+        <p>Built with <Heart size={14} fill="currentColor" className="about-page__footer-heart" /> using Python, FastAPI, React, and a love for deterministic software.</p>
         <p>MIT License · Copyright © 2026 <a href="https://github.com/jeannie-jy" target="_blank" rel="noopener noreferrer">Jingyu Wang</a></p>
         <p className="about-page__footer-links">
           <a href="https://github.com/jeannie-jy/Glimmer" target="_blank" rel="noopener noreferrer">GitHub</a>

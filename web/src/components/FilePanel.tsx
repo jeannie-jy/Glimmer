@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { WsServerMessage, WsClientMessage } from '../hooks/useWebSocket';
-import { File, Folder, Download, Eye, RefreshCw, Trash2 } from 'lucide-react';
+import { File, Folder, Download, Eye, RefreshCw, Trash2, X } from 'lucide-react';
 
 interface FileInfo { name: string; size: number; modified: string; }
 interface FilePanelProps {
@@ -79,7 +79,7 @@ const FilePanel: React.FC<FilePanelProps> = ({ messages, onSend, isConnected }) 
         ))}
       </div>
       {previewFile && (
-        <div className="file-panel__preview-overlay" onClick={() => { setPreviewFile(null); setPreviewPath(''); }}><div className="file-panel__preview" onClick={e => e.stopPropagation()}><div className="file-panel__preview-header"><span className="file-panel__preview-path">{previewFile}</span><span className="file-panel__preview-lang">{getLang(previewFile)}</span><button className="file-panel__preview-download" onClick={() => { triggerBrowserDownload(previewFile, previewContent); setPreviewFile(null); setPreviewPath(''); }} type="button"><Download size={14} /> Download</button><button className="file-panel__preview-close" onClick={() => { setPreviewFile(null); setPreviewPath(''); }} type="button">✕</button></div>
+        <div className="file-panel__preview-overlay" onClick={() => { setPreviewFile(null); setPreviewPath(''); }}><div className="file-panel__preview" onClick={e => e.stopPropagation()}><div className="file-panel__preview-header"><span className="file-panel__preview-path">{previewFile}</span><span className="file-panel__preview-lang">{getLang(previewFile)}</span><button className="file-panel__preview-download" onClick={() => { triggerBrowserDownload(previewFile, previewContent); setPreviewFile(null); setPreviewPath(''); }} type="button"><Download size={14} /> Download</button><button className="file-panel__preview-close" onClick={() => { setPreviewFile(null); setPreviewPath(''); }} type="button"><X size={14} /></button></div>
             <pre className="file-panel__preview-code"><code>{previewContent || 'Loading...'}</code></pre>
           </div>
         </div>

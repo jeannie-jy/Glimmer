@@ -6,7 +6,7 @@ import {
   Compass, Terminal, Download, Settings, Rocket,
   CheckCircle, AlertTriangle, Info, ExternalLink,
   ChevronDown, Code2, Zap, Shield,
-  Play, BookOpen, Wrench
+  Play, BookOpen, Wrench, X, Check
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ memory:
       <div className="guide-section__body">
         <div className="guide-tips">
           {[
-            { title: '明确具体目标', desc: '"修 bug" ❌ → "修复 src/auth.py 第 42 行 login 函数中 JWT token 过期时间为 0 的 bug" ✅。越具体越好。', icon: <CheckCircle size={16} /> },
+            { title: '明确具体目标', desc: (<>"修 bug" <X size={14} className="guide-tip-card__badge guide-tip-card__badge--bad" /> → "修复 src/auth.py 第 42 行 login 函数中 JWT token 过期时间为 0 的 bug" <Check size={14} className="guide-tip-card__badge guide-tip-card__badge--good" />。越具体越好。</>), icon: <CheckCircle size={16} /> },
             { title: '分批提交任务', desc: '复杂需求拆成多个小任务。Agent 在单次会话中保留上下文，可以逐步推进。每次完成后检查结果再继续。', icon: <CheckCircle size={16} /> },
             { title: '善用附件功能', desc: '涉及现有代码时，直接上传文件作为上下文附件（最多 95KB）。Agent 在生成代码前会参考附件内容。', icon: <CheckCircle size={16} /> },
             { title: '合理设置 max_retries', desc: '调试阶段设为 3-5 次给 Agent 足够的修正机会，生产环境设为 2-3 次以节省 Token。', icon: <CheckCircle size={16} /> },

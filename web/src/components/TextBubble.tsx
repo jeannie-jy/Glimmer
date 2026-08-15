@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Sparkles } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -102,7 +102,7 @@ const TextBubble: React.FC<TextBubbleProps> = ({ content, isStreaming }) => {
             {content}
           </ReactMarkdown>
         </div>
-        {isStreaming && <span className="text-bubble__cursor">✦</span>}
+        {isStreaming && <span className="text-bubble__cursor"><Sparkles size={14} /></span>}
       </div>
     </div>
   );

@@ -497,6 +497,11 @@
   text-decoration: none;
 }
 
+.about-page__footer-heart {
+  vertical-align: -2px;
+  color: #ef5350;
+}
+
 .about-page__footer a:hover {
   text-decoration: underline;
 }

@@ -620,6 +620,18 @@
   line-height: var(--leading-relaxed);
 }
 
+.guide-tip-card__badge {
+  vertical-align: -2px;
+}
+
+.guide-tip-card__badge--bad {
+  color: #ef5350;
+}
+
+.guide-tip-card__badge--good {
+  color: #4caf50;
+}
+
 /* -------------------------------------------------------------------------
    FAQ
    ------------------------------------------------------------------------- */
