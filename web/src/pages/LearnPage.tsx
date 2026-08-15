@@ -59,7 +59,7 @@ def transition(current: State, event: EventType) -> State:
   {
     id: 'guardrails',
     icon: <Shield size={22} />,
-    title: '三层护栏系统',
+    title: '四层护栏系统',
     summary: '纵深防御——路径沙箱 + 命令白名单 + 正则黑名单，每层独立可测，组合提供全面防护',
     details: [
       'Layer 1 — PathSandbox：resolve() 路径规范化 + 前缀匹配，防止 ../ 穿越攻击',
@@ -69,7 +69,7 @@ def transition(current: State, event: EventType) -> State:
       'BLOCK 动作：直接拒绝，附带原因，前端弹 GuardrailModal 展示详细信息',
       '已知局限：正则可被编码/混淆绕过。文档明确记录，建议生产环境补充 seccomp/AppArmor',
     ],
-    codeExample: `# 三层串行检查引擎
+    codeExample: `# 四层串行检查引擎
 class GuardrailEngine:
     def check(self, tool_call: ToolCall) -> GuardResult:
         # Layer 1: 路径沙箱（文件操作）
@@ -525,7 +525,7 @@ const LearnPage: React.FC = () => (
             { label: '数据流', items: '用户输入 → WebSocket → AgentLoop.run() → 状态机驱动 → LLM 调用 → 工具分发 → 护栏检查 → 反馈分析 → 循环 → 完成' },
             { label: '文件存储', items: '.harness/config.yaml（配置）、.harness/credentials/.key（凭据）、.harness/memory/*.json（记忆）' },
             { label: '数据库', items: 'PostgreSQL（部署模式）— users + user_configs + sessions + messages 四表' },
-            { label: '安全边界', items: 'Docker 沙箱（--network none, 512MB, 1CPU）+ 三层护栏 + shell=False + timeout' },
+            { label: '安全边界', items: 'Docker 沙箱（--network none, 512MB, 1CPU）+ 四层护栏 + shell=False + timeout' },
             { label: '测试策略', items: 'MockLLMAdapter → 零网络全链路单测 + pytest + pytest-asyncio + 94+ 用例' },
             { label: '前端技术', items: 'React 18 + TypeScript 5 + Vite 6 + Framer Motion v11 + CSS Variables + WebSocket' },
           ].map(item => (

@@ -481,10 +481,10 @@ model:
 
 | 工具 | 说明 | 关键参数 |
 |---|---|---|
-| `list_files` | 浏览工作区目录结构（有界深度，自动跳过 node_modules 等依赖目录） | `path`、`max_depth` |
+| `list_files` | 浏览工作区目录结构（有界深度，自动跳过 node_modules 等依赖目录） | `path`、`max_depth`（默认 3，上限 6） |
 | `restore_file` | 回滚文件到最近一次 `write_file` 覆盖前的内容（快照店在工作区之外，agent 不可见） | `path` |
 | `git` | 只读 git 三件套：`status`（结构化）、`diff HEAD`、`log`（最近 20 条） | `subcommand`、`path` |
-| `web_fetch` | 抓取公网网页文本（≤512KB，仅 http(s) 80/443；私网/云元数据地址硬封锁） | `url` |
+| `web_fetch` | 抓取公网网页文本（content 上限 512KB、stdout 截断 4096 字符、重定向最多 5 跳；仅 http(s) 80/443；私网/云元数据地址硬封锁） | `url` |
 
 安全说明：
 

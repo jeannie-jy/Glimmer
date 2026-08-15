@@ -24,7 +24,7 @@ const PRINCIPLES = [
     icon: <Layers size={28} />,
     title: '纵深防御',
     subtitle: 'Defense in Depth',
-    desc: '三层护栏串行检查——路径沙箱阻止文件越界，命令白名单拦截未知程序，正则黑名单捕获危险参数。每层独立可测，组合提供纵深防护。',
+    desc: '四层护栏串行检查——路径沙箱阻止文件越界，命令白名单拦截未知程序，正则黑名单捕获危险参数，secret 扫描与 egress 封锁拦截凭据泄露与内网访问。每层独立可测，组合提供纵深防护。',
   },
   {
     icon: <Workflow size={28} />,
@@ -66,7 +66,7 @@ const ARCH_LAYERS = [
   {
     label: 'Agent Core',
     color: '#d4859e',
-    items: ['确定性状态机 (8 态)', '三层护栏引擎', '9 内置工具 + 自定义扩展', 'LLM 适配器 (Anthropic/OpenAI/Mock)',
+    items: ['确定性状态机 (8 态)', '四层护栏引擎', '9 内置工具 + 自定义扩展', 'LLM 适配器 (Anthropic/OpenAI/Mock)',
       '新工具集：list_files 目录浏览 / restore_file 快照回滚 / git 只读检查 / web_fetch 联网查文档（SSRF 防护）',
       '护栏第四层：secret scan 敏感信息拦截（人工确认）+ execute_shell 内网地址硬封锁'],
   },
@@ -257,7 +257,7 @@ const AboutPage: React.FC = () => (
 │                                                   │
 │  ┌──────┐  ┌───────────┐  ┌───────────────┐     │
 │  │ Loop │─▶│ Guardrail │─▶│ Tool Dispatch │     │
-│  │Engine│  │ Engine(3L)│  │   Registry    │     │
+│  │Engine│  │ Engine(4L)│  │   Registry    │     │
 │  └──────┘  └───────────┘  └───────────────┘     │
 │      │                           │               │
 │  ┌───┴───┐                ┌──────┴──────┐       │
@@ -309,7 +309,7 @@ const AboutPage: React.FC = () => (
               </div>
               <div className="comp-card__item">
                 <span className="comp-card__item-name">guardrails/</span>
-                <span className="comp-card__item-desc">三层护栏——路径沙箱 + 命令白名单 + 正则黑名单</span>
+                <span className="comp-card__item-desc">四层护栏——路径沙箱 + 命令白名单 + 正则黑名单 + secret 扫描/egress 封锁</span>
               </div>
               <div className="comp-card__item">
                 <span className="comp-card__item-name">feedback/</span>
@@ -470,7 +470,7 @@ const AboutPage: React.FC = () => (
         >
           {[
             { value: '8', label: 'Agent 状态' },
-            { value: '3', label: '护栏层' },
+            { value: '4', label: '护栏层' },
             { value: '9', label: '内置工具' },
             { value: '7+', label: 'LLM 供应商' },
             { value: '94+', label: '测试用例' },

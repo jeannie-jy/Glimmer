@@ -1,4 +1,4 @@
-"""Guardrail engine — orchestrates three layers of defense."""
+"""Guardrail engine — orchestrates four layers of defense."""
 import re
 
 from harness.models import ToolCall, GuardResult, GuardAction
@@ -12,11 +12,14 @@ _URL_RE = re.compile(r"https?://[^\s\"'`]+", re.IGNORECASE)
 
 
 class GuardrailEngine:
-    """Three-layer safety check for all tool invocations.
+    """Four-layer safety check for all tool invocations.
 
     Layer 1: Path sandbox — restricts filesystem access boundaries
     Layer 2: Command whitelist — only known-safe executables
     Layer 3: Pattern blacklist — intercepts dangerous argument patterns
+    Layer 4: Secret scan + egress SSRF — ASK_HUMAN on high-confidence
+    credential patterns; hard BLOCK on private/loopback/cloud-metadata
+    URLs in shell commands and web_fetch targets
     """
 
     def __init__(self, sandbox_root: str, whitelist_extra: list[str] | None = None):
