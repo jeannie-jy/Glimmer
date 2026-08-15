@@ -3,6 +3,7 @@ from harness.models import ToolCall, GuardResult, GuardAction
 from harness.guardrails.path_sandbox import PathSandbox
 from harness.guardrails.whitelist import CommandWhitelist
 from harness.guardrails.patterns import PatternBlacklist
+from harness.netguard import validate_url
 
 
 class GuardrailEngine:
@@ -54,6 +55,13 @@ class GuardrailEngine:
                 result = self._path_sandbox.validate(raw_path, "read")
                 if result.action != GuardAction.ALLOW:
                     return result
+
+        # Layer 4: web_fetch URL must pass the SSRF guard (defense in depth
+        # behind the tool's own check)
+        if tool_call.name == "web_fetch":
+            reason = validate_url(tool_call.arguments.get("url", ""))
+            if reason:
+                return GuardResult(action=GuardAction.BLOCK, layer=4, reason=reason)
 
         # Layer 2 & 3: Command safety for shell execution
         if tool_call.name in ("execute_shell", "run_tests"):

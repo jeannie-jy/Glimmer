@@ -87,3 +87,16 @@ def test_git_status_via_agent_loop(tmp_path, monkeypatch):
         assert result["tool_name"] == "git"
         assert result["exit_code"] == 0
         _receive_until(ws, "session.complete")
+
+
+def test_web_fetch_metadata_url_blocked_by_engine(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch, [
+        _tool_use("web_fetch", {"url": "http://169.254.169.254/latest/meta-data/"}),
+        _ok("Tried."),
+    ])
+    with client.websocket_connect("/ws/session") as ws:
+        ws.send_json({"type": "task.submit", "content": "Fetch instance metadata"})
+        pending = _receive_until(ws, "guardrail.pending")
+        assert pending["action"] == "blocked"
+        assert "169.254.169.254" in pending["reason"]
+    # BLOCK leaves the session AWAITING_HUMAN; disconnect without deciding.
