@@ -17,6 +17,8 @@ export type WsClientMessage =
   | { type: 'files.delete'; path: string };
 
 export type WsServerMessage =
+  | { type: 'user.message'; content: string }
+  | { type: 'ping' }
   | { type: 'state.change'; from: string; to: string }
   | { type: 'llm.response'; content: string; tool_calls?: unknown[] }
   | { type: 'llm.stream'; delta: string; index?: number; done?: boolean }

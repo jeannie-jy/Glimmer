@@ -36,6 +36,7 @@ build/
 __pycache__/
 .pytest_cache/
 web/dist/
+node_modules/
 web/node_modules/
 # pyinstaller.spec is tracked intentionally
 !pyinstaller.spec

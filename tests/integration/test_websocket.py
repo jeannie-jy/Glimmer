@@ -85,27 +85,84 @@ class TestWebSocketSession:
         with TestClient(app).websocket_connect("/ws/session") as ws:
             ws.send_json({"type": "task.submit", "content": "Say hello"})
 
-            # 1. state.change: idle -> planning
+            # 1. session.created — announced before the turn so the frontend
+            #    learns the session id even for fresh bootstrap sessions.
+            evt = ws.receive_json()
+            assert evt["type"] == "session.created"
+            session_id = evt["session_id"]
+            assert session_id
+
+            # 2. user.message — the submitted task echoed at its turn start.
+            evt = ws.receive_json()
+            assert evt["type"] == "user.message"
+            assert evt["content"] == "Say hello"
+
+            # 3. state.change: idle -> planning
             evt = ws.receive_json()
             assert evt["type"] == "state.change"
             assert evt["from"] == "idle"
             assert evt["to"] == "planning"
 
-            # 2. llm.response
+            # 4. llm.response
             evt = ws.receive_json()
             assert evt["type"] == "llm.response"
             assert "Hello, world!" in evt["content"]
 
-            # 3. state.change: planning -> completed
+            # 5. state.change: planning -> completed
             evt = ws.receive_json()
             assert evt["type"] == "state.change"
             assert evt["from"] == "planning"
             assert evt["to"] == "completed"
 
-            # 4. session.complete
+            # 6. session.complete
             evt = ws.receive_json()
             assert evt["type"] == "session.complete"
             assert "session_id" in evt
+
+    def test_multi_turn_echoes_each_task_before_its_run(self, config_manager, credential_manager):
+        """Every turn echoes its submitted task as user.message before the
+        turn's first planning transition; the session id stays stable."""
+        mock = MockLLMAdapter([
+            LLMResponse(content="First answer.", stop_reason="complete"),
+            LLMResponse(content="Second answer.", stop_reason="complete"),
+        ])
+        app = build_app(config_manager, credential_manager, llm_override=mock)
+
+        with TestClient(app).websocket_connect("/ws/session") as ws:
+            ws.send_json({"type": "task.submit", "content": "Task one"})
+            events = []
+            for _ in range(30):
+                evt = ws.receive_json()
+                events.append(evt)
+                if evt["type"] == "session.complete":
+                    break
+
+            created = [e for e in events if e["type"] == "session.created"]
+            assert len(created) == 1, events
+            session_id = created[0]["session_id"]
+
+            users = [e for e in events if e["type"] == "user.message"]
+            assert [u["content"] for u in users] == ["Task one"]
+            idx_user = events.index(users[0])
+            idx_planning = events.index(
+                next(e for e in events if e["type"] == "state.change" and e["to"] == "planning")
+            )
+            assert idx_user < idx_planning
+
+            ws.send_json({"type": "task.submit", "content": "Task two"})
+            events2 = []
+            for _ in range(30):
+                evt = ws.receive_json()
+                events2.append(evt)
+                if evt["type"] == "session.complete":
+                    break
+
+            users2 = [e for e in events2 if e["type"] == "user.message"]
+            assert [u["content"] for u in users2] == ["Task two"]
+            assert any(
+                e["type"] == "state.change" and e.get("from") == "completed" and e.get("to") == "planning"
+                for e in events2
+            ), events2
 
     def test_tool_use_flow(self, config_manager, credential_manager, default_tools):
         """Agent uses a tool, events include tool.invoke and tool.result."""

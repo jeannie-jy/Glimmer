@@ -24,30 +24,28 @@ export function buildDisplayItems(
   userTasks?: Array<{text: string; files?: Array<{name: string; size: number}>}>,
 ): DisplayItem[] {
   const rawItems: DisplayItem[] = (historyItems || []).map(h => ({ id: h.id, kind: h.type as DisplayItem['kind'], data: h.data }));
-  let userTaskIdx = 0;
   const userMsgs = userTasks ? [...userTasks] : [];
 
-  const emitUserIfNeeded = () => {
-    if (userTaskIdx < userMsgs.length) {
-      const um = userMsgs[userTaskIdx];
-      rawItems.push({ id: -2000 - userTaskIdx, kind: 'user', data: { content: typeof um === 'string' ? um : um.text, files: typeof um === 'string' ? undefined : um.files } });
-      userTaskIdx++;
-    }
-  };
-
-  // A turn boundary: the loop enters PLANNING from a rest state, i.e. at the
-  // start of a brand-new user request. Mid-turn re-entries into PLANNING
-  // (observing→planning to generate the final answer, correcting→planning to
-  // retry) must NOT emit the next user message — they belong to the same
-  // Agent Run, which has to stay one uninterrupted block.
-  const TURN_START_FROM = ['idle', 'completed', 'error'];
-  const isTurnStartPlanning = (m: WsServerMessage) =>
-    m.type === 'state.change' && m.to === 'planning' && TURN_START_FROM.includes(m.from);
+  // The server echoes every submitted task as a ``user.message`` event right
+  // where its turn starts — the stream itself is the source of truth for user
+  // message placement. State transitions are NEVER used to place user
+  // messages: a reconnected session's first planning transition must not
+  // re-emit a pending task into the middle of a previous Agent Run.
+  // ``echoedCounts`` tracks which pending tasks already appear in the stream
+  // so the optimistic tail below only adds the ones still awaiting their echo.
+  const echoedCounts = new Map<string, number>();
+  const echoKey = (content: string) => parseUploadedFiles(content).cleanText || content;
 
   let i = 0;
   while (i < messages.length) {
     const msg = messages[i];
-    if (isTurnStartPlanning(msg)) emitUserIfNeeded();
+
+    if (msg.type === 'user.message') {
+      rawItems.push({ id: i, kind: 'user', data: { content: msg.content } });
+      const key = echoKey(msg.content);
+      echoedCounts.set(key, (echoedCounts.get(key) || 0) + 1);
+      i++; continue;
+    }
 
     if (msg.type === 'state.change') {
       const state = msg.to;
@@ -85,7 +83,18 @@ export function buildDisplayItems(
     i++;
   }
 
-  while (userTaskIdx < userMsgs.length) { const um = userMsgs[userTaskIdx]; rawItems.push({ id: -2000 - userTaskIdx, kind: 'user', data: { content: typeof um === 'string' ? um : um.text, files: typeof um === 'string' ? undefined : um.files } }); userTaskIdx++; }
+  // Optimistic tail: tasks submitted but not yet echoed by the server render
+  // below all existing content — they are the newest submissions, so the end
+  // of the timeline is their correct position.
+  let tailIdx = 0;
+  for (const um of userMsgs) {
+    const text = typeof um === 'string' ? um : um.text;
+    const key = echoKey(text);
+    const remaining = echoedCounts.get(key) || 0;
+    if (remaining > 0) { echoedCounts.set(key, remaining - 1); continue; }
+    rawItems.push({ id: -2000 - tailIdx, kind: 'user', data: { content: text, files: typeof um === 'string' ? undefined : um.files } });
+    tailIdx++;
+  }
 
   // Group consecutive non-user items into agent-group containers
   const grouped: DisplayItem[] = []; let agentBuffer: DisplayItem[] = [];

@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from harness.models import (
     State, Message, Session, ToolCall, ToolResult, ToolDef,
-    GuardAction, Verdict,
+    GuardAction, Verdict, TokenUsage,
 )
 from harness.state_machine import transition, EventType
 from harness.llm.adapter import LLMAdapter
@@ -64,18 +64,31 @@ class AgentLoop:
     # Public API
     # ------------------------------------------------------------------
 
-    async def run(self, task: str, llm: LLMAdapter) -> Session:
+    async def run(self, task: str, llm: LLMAdapter, session: Session | None = None) -> Session:
         """Execute a task using the LLM-driven agent loop.
 
         Args:
             task: The user task/instruction to execute.
             llm: An LLM adapter (real or mock) for generating responses.
+            session: An optional existing session to run in. When given, the
+                session id stays stable (its partial history from a cancelled
+                first turn is reset); otherwise a fresh session is created.
 
         Returns:
             A completed Session with full message history, tool calls,
             token usage, and final state.
         """
-        session = Session(id=str(uuid.uuid4()), task=task, state=State.IDLE)
+        if session is None:
+            session = Session(id=str(uuid.uuid4()), task=task, state=State.IDLE)
+        else:
+            # Reusing a session (e.g. a cancelled first turn): keep the id but
+            # discard the partial run so the retry starts from a clean slate.
+            session.messages.clear()
+            session.task = task
+            session.state = State.IDLE
+            session.tool_calls = []
+            session.total_tokens = TokenUsage()
+            session.retry_count = 0
         tool_defs = self._tools.list_defs()
         tool_desc = "\n".join(f"- {t.name}: {t.description}" for t in tool_defs)
 

@@ -76,6 +76,9 @@ export function useSession(
         case 'session.created':
           sessionId = msg.session_id;
           break;
+        case 'session.saved':
+          sessionId = msg.session_id;
+          break;
       }
     }
 

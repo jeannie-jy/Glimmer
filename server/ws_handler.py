@@ -435,6 +435,33 @@ async def websocket_session(websocket: WebSocket) -> None:
     """
     await websocket.accept()
 
+    # ---- Single persistent reader: consumers pull from ws_queue ----
+    # Cancelling a wait_for(receive_json()) mid-flight corrupts uvicorn's
+    # receive channel, and idle proxies (Render) kill connections during long
+    # LLM waits — so one dedicated reader task owns the socket and hands
+    # messages to consumers via a queue. The sentinel marks a closed socket.
+    _WS_CLOSED = object()
+    ws_queue: asyncio.Queue = asyncio.Queue()
+    _ws_send_lock = asyncio.Lock()
+
+    async def _ws_send(payload: dict) -> None:
+        """Serialize sends so concurrent emitters (loop events, keepalive
+        pings) never interleave websocket frames."""
+        async with _ws_send_lock:
+            await websocket.send_json(payload)
+
+    async def _ws_reader() -> None:
+        try:
+            while True:
+                raw = await websocket.receive_json()
+                await ws_queue.put(raw)
+        except Exception:
+            pass
+        finally:
+            await ws_queue.put(_WS_CLOSED)
+
+    reader_task = asyncio.create_task(_ws_reader())
+
     # ---- Mode detection and JWT extraction ----
     token = websocket.query_params.get("token", "")
     user_id_from_jwt = get_user_id_from_token(token)
@@ -487,7 +514,9 @@ async def websocket_session(websocket: WebSocket) -> None:
     deferred: list[dict] = []
     while msg_type not in ("task.submit", "session.load"):
         try:
-            raw = await websocket.receive_json()
+            raw = await ws_queue.get()
+            if raw is _WS_CLOSED:
+                return
             msg_type = raw.get("type", "")
             if msg_type not in ("task.submit", "session.load"):
                 if msg_type == "files.list":
@@ -549,7 +578,9 @@ async def websocket_session(websocket: WebSocket) -> None:
             })
         # Wait for next message (task.submit to continue, or session.new to start fresh)
         try:
-            raw = await websocket.receive_json()
+            raw = await ws_queue.get()
+            if raw is _WS_CLOSED:
+                return
         except WebSocketDisconnect:
             return
         if raw.get("type") == "task.submit":
@@ -654,20 +685,24 @@ async def websocket_session(websocket: WebSocket) -> None:
     # ---- Wire event handler → WebSocket ----
     async def emit_to_ws(event: str, **data: object) -> None:
         try:
-            await websocket.send_json({"type": event, **data})
-            # After a successful write_file, emit file.created or file.modified
-            if event == "tool.result" and data.get("tool_name") == "write_file" and data.get("exit_code") == 0:
-                # Extract path from the write_file stdout: "Wrote N bytes to <path>"
-                stdout = str(data.get("stdout", ""))
-                import re
-                match = re.search(r"to\s+(.+)$", stdout)
-                if match:
-                    filepath = match.group(1).strip()
-                    if filepath not in _known_files:
-                        _known_files.add(filepath)
-                        await websocket.send_json({"type": "file.created", "path": filepath})
-                    else:
-                        await websocket.send_json({"type": "file.modified", "path": filepath})
+            # Hold the send lock across the event and its file.created /
+            # file.modified follow-up so concurrent senders (keepalive pings)
+            # cannot interleave between them.
+            async with _ws_send_lock:
+                await websocket.send_json({"type": event, **data})
+                # After a successful write_file, emit file.created or file.modified
+                if event == "tool.result" and data.get("tool_name") == "write_file" and data.get("exit_code") == 0:
+                    # Extract path from the write_file stdout: "Wrote N bytes to <path>"
+                    stdout = str(data.get("stdout", ""))
+                    import re
+                    match = re.search(r"to\s+(.+)$", stdout)
+                    if match:
+                        filepath = match.group(1).strip()
+                        if filepath not in _known_files:
+                            _known_files.add(filepath)
+                            await websocket.send_json({"type": "file.created", "path": filepath})
+                        else:
+                            await websocket.send_json({"type": "file.modified", "path": filepath})
         except Exception:
             pass
 
@@ -685,18 +720,22 @@ async def websocket_session(websocket: WebSocket) -> None:
         """Execute a single task turn. Returns the updated session or None on error."""
         nonlocal harness_session
         try:
-            if harness_session.state in (State.IDLE, State.COMPLETED, State.ERROR):
-                if harness_session.state == State.IDLE:
-                    # First turn: use run()
-                    llm = await _create_llm()
-                    # Re-wire event handler (may have been cleared)
-                    loop.on_event(emit_to_ws)
-                    harness_session = await loop.run(task_text, llm)
-                else:
-                    # Subsequent turn: use continue_turn()
-                    llm = await _create_llm()
-                    loop.on_event(emit_to_ws)
-                    harness_session = await loop.continue_turn(harness_session, task_text, llm)
+            # Echo the submission into the event stream exactly where this
+            # turn starts. The frontend renders user bubbles from these
+            # echoes, so ordering never depends on client-side state guessing.
+            await emit_to_ws("user.message", content=task_text)
+            llm = await _create_llm()
+            # Re-wire event handler (may have been cleared)
+            loop.on_event(emit_to_ws)
+            if harness_session.state == State.IDLE:
+                # First turn — or a re-run after a cancelled first turn. run()
+                # reuses the session object so its id stays stable.
+                harness_session = await loop.run(task_text, llm, harness_session)
+            else:
+                # Subsequent turn — or recovery after a cancelled turn left
+                # the session stuck in a mid-run state (e.g. planning).
+                # continue_turn() keeps the accumulated history.
+                harness_session = await loop.continue_turn(harness_session, task_text, llm)
 
             # Handle AWAITING_HUMAN sub-loop
             while harness_session.state.value == "awaiting_human":
@@ -753,9 +792,17 @@ async def websocket_session(websocket: WebSocket) -> None:
         buffered: list[dict] = []
         while not runner.done():
             try:
-                raw = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
+                raw = await asyncio.wait_for(ws_queue.get(), timeout=30.0)
             except asyncio.TimeoutError:
+                # Keepalive: the final LLM call of a turn can exceed 30s
+                # with zero traffic — ping so proxies don't kill the socket.
+                await _ws_send({"type": "ping"})
                 continue
+            if raw is _WS_CLOSED:
+                # Re-queue the sentinel so the main loop also sees the close
+                # and exits instead of blocking on the now-dead socket.
+                ws_queue.put_nowait(_WS_CLOSED)
+                raise WebSocketDisconnect()
             t = raw.get("type", "")
             if t == "session.cancel":
                 cancel_event.set()
@@ -955,13 +1002,19 @@ async def websocket_session(websocket: WebSocket) -> None:
     # just-uploaded file fails with "No such file or directory".
     for d in deferred:
         print(f"[WS] Replaying deferred: {d.get('type', '')}")
-        await handle_message(d)
+        try:
+            await handle_message(d)
+        except WebSocketDisconnect:
+            break
 
     buffered: list[dict] = []
     # ---- First task (from bootstrap) ----
     if task_content:
-        if is_resuming:
-            await emit_to_ws("session.created", session_id=harness_session.id)
+        # Announce the session id up front — the id is final because run()
+        # reuses the bootstrap session. (The fresh-bootstrap path used to
+        # skip this, so the frontend never learned the id and could not
+        # resume history across reconnects.)
+        await emit_to_ws("session.created", session_id=harness_session.id)
         # Auto-save on submit (ChatGPT-style): the conversation appears in
         # the history sidebar from the first message, not only on completion.
         await _save_and_notify()
@@ -989,16 +1042,23 @@ async def websocket_session(websocket: WebSocket) -> None:
     # ---- Replay messages buffered during the first turn ----
     for d in buffered:
         print(f"[WS] Replaying buffered: {d.get('type', '')}")
-        await handle_message(d)
+        try:
+            await handle_message(d)
+        except WebSocketDisconnect:
+            break
 
     # ---- Main message loop ----
 
     try:
         while True:
             try:
-                raw = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
+                raw = await asyncio.wait_for(ws_queue.get(), timeout=30.0)
             except asyncio.TimeoutError:
+                # Idle keepalive — same rationale as the pump.
+                await _ws_send({"type": "ping"})
                 continue
+            if raw is _WS_CLOSED:
+                break
 
             msg_type = raw.get("type", "")
             print(f"[WS] Received: {msg_type}")
@@ -1009,6 +1069,11 @@ async def websocket_session(websocket: WebSocket) -> None:
     except Exception:
         pass
     finally:
+        reader_task.cancel()
+        try:
+            await reader_task
+        except (asyncio.CancelledError, Exception):
+            pass
         # Save on disconnect
         await _save_and_notify()
         if runner is not None and not runner.done():
