@@ -69,3 +69,36 @@ def test_engine_allows_public_urls_in_shell_command():
                     arguments={"command": "pip install https://8.8.8.8/simple/"})
     result = engine.check(call)
     assert result.action == GuardAction.ALLOW
+
+
+def test_engine_blocks_internal_urls_in_unwhitelisted_command():
+    # curl is NOT whitelisted — a BLOCK here proves the egress check runs
+    # BEFORE the whitelist's ASK_HUMAN (regression pin for Layer 4 order).
+    engine = GuardrailEngine(sandbox_root=".")
+    call = ToolCall(id="t4", name="execute_shell",
+                    arguments={"command": "curl http://169.254.169.254/latest/meta-data/"})
+    result = engine.check(call)
+    assert result.action == GuardAction.BLOCK
+    assert "169.254.169.254" in result.reason
+
+
+def test_engine_blocks_secret_command_with_internal_url():
+    # A command with BOTH a secret pattern and an internal URL must BLOCK:
+    # egress runs before the secret-scan ASK_HUMAN, so one approve click
+    # can never mask a hard block underneath it.
+    engine = GuardrailEngine(sandbox_root=".")
+    call = ToolCall(id="t5", name="execute_shell",
+                    arguments={"command": "pip install --token ghp_abcdefghijklmnopqrstuvwxyz0123456789 http://169.254.169.254/x"})
+    result = engine.check(call)
+    assert result.action == GuardAction.BLOCK
+    assert "169.254.169.254" in result.reason
+
+
+def test_engine_blocks_uppercase_scheme_internal_url():
+    # curl/pip accept uppercase schemes — the egress regex must match them.
+    engine = GuardrailEngine(sandbox_root=".")
+    call = ToolCall(id="t6", name="execute_shell",
+                    arguments={"command": "pip install HTTP://169.254.169.254/x"})
+    result = engine.check(call)
+    assert result.action == GuardAction.BLOCK
+    assert "169.254.169.254" in result.reason

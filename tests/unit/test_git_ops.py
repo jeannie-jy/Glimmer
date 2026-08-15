@@ -69,6 +69,22 @@ def test_docker_mode_exit_1_forwards_error_not_success():
     assert result.structured is None
 
 
+def test_diff_with_real_changes_succeeds(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "a.txt").write_text("one\n")
+    subprocess.run(["git", "add", "a.txt"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], cwd=tmp_path, check=True)
+    (tmp_path / "a.txt").write_text("two\n")
+
+    tool = GitTool(cwd=tmp_path)
+    result = asyncio.run(tool.execute({"subcommand": "diff"}))
+
+    # git diff exits 1 when there ARE differences — that is its success case.
+    assert result.exit_code == 0
+    assert "a.txt" in result.stdout
+    assert "+two" in result.stdout
+
+
 def test_local_mode_exit_1_forwards_error_not_success(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "harness.tools.git_ops.subprocess.run",
@@ -77,6 +93,21 @@ def test_local_mode_exit_1_forwards_error_not_success(tmp_path, monkeypatch):
     tool = GitTool(cwd=tmp_path)
     result = asyncio.run(tool.execute({"subcommand": "diff"}))
     assert result.exit_code == 1
+    assert result.structured is None
+
+
+def test_diff_exit_1_with_diff_output_counts_as_success(tmp_path, monkeypatch):
+    # Some git versions/builds exit 1 when the diff output is non-empty
+    # (differences found) — for `diff` that must count as success, not FAIL.
+    monkeypatch.setattr(
+        "harness.tools.git_ops.subprocess.run",
+        lambda *a, **k: SimpleNamespace(
+            returncode=1, stdout="diff --git a/a.txt b/a.txt\n+two\n", stderr=""),
+    )
+    tool = GitTool(cwd=tmp_path)
+    result = asyncio.run(tool.execute({"subcommand": "diff"}))
+    assert result.exit_code == 0
+    assert "+two" in result.stdout
     assert result.structured is None
 
 

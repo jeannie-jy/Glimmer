@@ -54,36 +54,44 @@ class WebFetchTool(Tool):
                     return ToolResult(tool_name="web_fetch", exit_code=1, stdout="", stderr=reason,
                         duration_ms=int((time.time() - start) * 1000))
                 async with httpx.AsyncClient(timeout=15.0, follow_redirects=False) as client:
-                    resp = await client.get(current, headers={"User-Agent": "GlimmerAgent/1.0"})
-                if resp.status_code in (301, 302, 303, 307, 308):
-                    loc = resp.headers.get("location")
-                    if not loc:
-                        return ToolResult(tool_name="web_fetch", exit_code=1, stdout="",
-                            stderr=f"Redirect without location: {current}",
-                            duration_ms=int((time.time() - start) * 1000))
-                    current = str(httpx.URL(resp.url).join(loc))
-                    continue
+                    async with client.stream("GET", current, headers={"User-Agent": "GlimmerAgent/1.0"}) as resp:
+                        if resp.status_code in (301, 302, 303, 307, 308):
+                            loc = resp.headers.get("location")
+                            if not loc:
+                                return ToolResult(tool_name="web_fetch", exit_code=1, stdout="",
+                                    stderr=f"Redirect without location: {current}",
+                                    duration_ms=int((time.time() - start) * 1000))
+                            current = str(httpx.URL(resp.url).join(loc))
+                            continue
 
-                ct = resp.headers.get("content-type", "")
-                if not any(ct.lower().startswith(a) for a in ALLOWED_CONTENT_TYPES):
-                    return ToolResult(tool_name="web_fetch", exit_code=1, stdout="",
-                        stderr=f"Content type not allowed: {ct or '(none)'}",
-                        duration_ms=int((time.time() - start) * 1000))
-                body = resp.text
-                if len(body) > MAX_BYTES:
-                    body = body[:MAX_BYTES]
-                stdout_body = body[:MAX_STDOUT_CHARS]
-                if len(body) > MAX_STDOUT_CHARS:
-                    stdout_body += "\n...[truncated]"
-                return ToolResult(tool_name="web_fetch", exit_code=0,
-                    stdout=stdout_body,
-                    structured={
-                        "final_url": str(resp.url),
-                        "status_code": resp.status_code,
-                        "content_type": ct,
-                        "content": body,
-                    },
-                    duration_ms=int((time.time() - start) * 1000))
+                        ct = resp.headers.get("content-type", "")
+                        if not any(ct.lower().startswith(a) for a in ALLOWED_CONTENT_TYPES):
+                            return ToolResult(tool_name="web_fetch", exit_code=1, stdout="",
+                                stderr=f"Content type not allowed: {ct or '(none)'}",
+                                duration_ms=int((time.time() - start) * 1000))
+
+                        # Stream the body with a hard cap: abort as soon as
+                        # MAX_BYTES is exceeded so an oversized response is
+                        # never fully materialized in memory (the transfer
+                        # itself is bounded too, not just the stored copy).
+                        buf = bytearray()
+                        async for chunk in resp.aiter_bytes():
+                            buf.extend(chunk)
+                            if len(buf) > MAX_BYTES:
+                                break
+                        body = bytes(buf[:MAX_BYTES]).decode("utf-8", errors="replace")
+                        stdout_body = body[:MAX_STDOUT_CHARS]
+                        if len(body) > MAX_STDOUT_CHARS:
+                            stdout_body += "\n...[truncated]"
+                        return ToolResult(tool_name="web_fetch", exit_code=0,
+                            stdout=stdout_body,
+                            structured={
+                                "final_url": str(resp.url),
+                                "status_code": resp.status_code,
+                                "content_type": ct,
+                                "content": body,
+                            },
+                            duration_ms=int((time.time() - start) * 1000))
         except Exception as e:
             return ToolResult(tool_name="web_fetch", exit_code=1, stdout="", stderr=str(e),
                 duration_ms=int((time.time() - start) * 1000))

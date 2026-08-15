@@ -78,6 +78,11 @@ class GitTool(Tool):
             return ToolResult(tool_name="git", exit_code=1, stdout="",
                 stderr=f"Not a git repository: {repo}",
                 duration_ms=int((time.time() - start) * 1000))
+        # `git diff` exits 1 when there ARE differences — with diff output
+        # that is its success signal, not an error. Exit 1 with empty stdout
+        # still means a real error (status/log paths unchanged).
+        if sub == "diff" and code == 1 and stdout.strip():
+            code = 0
         if code not in (0, 1):
             return ToolResult(tool_name="git", exit_code=code, stdout=stdout, stderr=stderr,
                 duration_ms=int((time.time() - start) * 1000))

@@ -21,6 +21,9 @@ BLOCKED_NETS = [
     ipaddress.ip_network("fc00::/7"),
     ipaddress.ip_network("fe80::/10"),
     ipaddress.ip_network("::ffff:0:0/96"),
+    # IPv4-compatible IPv6 (::/96, disjoint from ::ffff:0:0/96): closes the
+    # [::127.0.0.1] / [::169.254.169.254] literal bypass.
+    ipaddress.ip_network("::/96"),
 ]
 
 

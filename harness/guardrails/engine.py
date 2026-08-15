@@ -8,7 +8,7 @@ from harness.guardrails.patterns import PatternBlacklist
 from harness.guardrails.secrets import SecretScanner
 from harness.netguard import validate_url
 
-_URL_RE = re.compile(r"https?://[^\s\"'`]+")
+_URL_RE = re.compile(r"https?://[^\s\"'`]+", re.IGNORECASE)
 
 
 class GuardrailEngine:
@@ -54,14 +54,12 @@ class GuardrailEngine:
             if result.action != GuardAction.ALLOW:
                 return result
 
-        # Layer 4a: high-confidence secret patterns in written content or
-        # shell commands (ASK_HUMAN — one approve click, not a blocked write).
+        # Layer 4a: high-confidence secret patterns in written content
+        # (ASK_HUMAN — one approve click, not a blocked write). Shell
+        # commands are scanned later, inside the command block below, so the
+        # egress BLOCK always fires first.
         if tool_call.name == "write_file":
             result = self._secrets.check(str(tool_call.arguments.get("content", "")))
-            if result.action != GuardAction.ALLOW:
-                return result
-        if tool_call.name == "execute_shell":
-            result = self._secrets.check(str(tool_call.arguments.get("command", "")))
             if result.action != GuardAction.ALLOW:
                 return result
 
@@ -89,12 +87,20 @@ class GuardrailEngine:
             if command:
                 # Layer 4b: egress URLs in the command must pass netguard —
                 # private/loopback/cloud-metadata targets are hard-blocked.
-                # Checked BEFORE the whitelist: curl etc. are not whitelisted
-                # and would otherwise surface as ASK_HUMAN first.
+                # Checked BEFORE the secret scan and the whitelist: curl etc.
+                # are not whitelisted and would otherwise surface as ASK_HUMAN
+                # first, and an approve-click on a secret must never mask a
+                # hard BLOCK underneath it.
                 for m in _URL_RE.finditer(command):
                     reason = validate_url(m.group(0))
                     if reason:
                         return GuardResult(action=GuardAction.BLOCK, layer=4, reason=reason)
+                # Layer 4a: secret scan for shell commands — AFTER egress so a
+                # BLOCK always wins over an ASK_HUMAN approval.
+                if tool_call.name == "execute_shell":
+                    result = self._secrets.check(str(command))
+                    if result.action != GuardAction.ALLOW:
+                        return result
                 # Layer 2: Whitelist
                 result = self._whitelist.check(command)
                 if result.action != GuardAction.ALLOW:
