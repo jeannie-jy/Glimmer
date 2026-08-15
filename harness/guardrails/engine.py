@@ -1,9 +1,14 @@
 """Guardrail engine — orchestrates three layers of defense."""
+import re
+
 from harness.models import ToolCall, GuardResult, GuardAction
 from harness.guardrails.path_sandbox import PathSandbox
 from harness.guardrails.whitelist import CommandWhitelist
 from harness.guardrails.patterns import PatternBlacklist
+from harness.guardrails.secrets import SecretScanner
 from harness.netguard import validate_url
+
+_URL_RE = re.compile(r"https?://[^\s\"'`]+")
 
 
 class GuardrailEngine:
@@ -18,6 +23,7 @@ class GuardrailEngine:
         self._path_sandbox = PathSandbox(sandbox_root)
         self._whitelist = CommandWhitelist(extra=whitelist_extra)
         self._patterns = PatternBlacklist()
+        self._secrets = SecretScanner()
 
     def check(self, tool_call: ToolCall) -> GuardResult:
         # Layer 1: Path sandbox for file operations
@@ -48,6 +54,17 @@ class GuardrailEngine:
             if result.action != GuardAction.ALLOW:
                 return result
 
+        # Layer 4a: high-confidence secret patterns in written content or
+        # shell commands (ASK_HUMAN — one approve click, not a blocked write).
+        if tool_call.name == "write_file":
+            result = self._secrets.check(str(tool_call.arguments.get("content", "")))
+            if result.action != GuardAction.ALLOW:
+                return result
+        if tool_call.name == "execute_shell":
+            result = self._secrets.check(str(tool_call.arguments.get("command", "")))
+            if result.action != GuardAction.ALLOW:
+                return result
+
         # Layer 1 also: Path sandbox for git repo path
         if tool_call.name == "git":
             raw_path = tool_call.arguments.get("path") or ""
@@ -70,6 +87,14 @@ class GuardrailEngine:
                 path = tool_call.arguments.get("path", "tests/")
                 command = f"python -m pytest {path} -q"
             if command:
+                # Layer 4b: egress URLs in the command must pass netguard —
+                # private/loopback/cloud-metadata targets are hard-blocked.
+                # Checked BEFORE the whitelist: curl etc. are not whitelisted
+                # and would otherwise surface as ASK_HUMAN first.
+                for m in _URL_RE.finditer(command):
+                    reason = validate_url(m.group(0))
+                    if reason:
+                        return GuardResult(action=GuardAction.BLOCK, layer=4, reason=reason)
                 # Layer 2: Whitelist
                 result = self._whitelist.check(command)
                 if result.action != GuardAction.ALLOW:

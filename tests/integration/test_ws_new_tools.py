@@ -100,3 +100,17 @@ def test_web_fetch_metadata_url_blocked_by_engine(tmp_path, monkeypatch):
         assert pending["action"] == "blocked"
         assert "169.254.169.254" in pending["reason"]
     # BLOCK leaves the session AWAITING_HUMAN; disconnect without deciding.
+
+
+def test_secret_in_write_triggers_guardrail_pending(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch, [
+        _tool_use("write_file", {"path": "leak.txt", "content": "token = 'sk-ant-abcdefghijklmnopqrstuvwxyz012345'"}),
+        _ok("Done."),
+    ])
+    with client.websocket_connect("/ws/session") as ws:
+        ws.send_json({"type": "task.submit", "content": "Write a config with a token"})
+        pending = _receive_until(ws, "guardrail.pending")
+        assert pending["action"] == "ask_human"
+        ws.send_json({"type": "guardrail.reject"})
+        _receive_until(ws, "session.complete")
+    assert not (tmp_path / "leak.txt").exists()
