@@ -47,9 +47,9 @@ const ConceptCards: React.FC = () => {
 
       <h2 className="learn-section__title" style={{ marginTop: 'var(--space-8)' }}><BookOpen size={20} /> 文档链接</h2>
       <div className="learn-links">
-        <a href="/README.md" className="learn-link">README — 项目文档</a>
-        <a href="/DESIGN.md" className="learn-link">DESIGN.md — 设计系统</a>
-        <a href="https://github.com/jeannie-jy/Glimmer/wiki" target="_blank" rel="noopener noreferrer" className="learn-link">GitHub Wiki — 更多资源</a>
+        <a href="https://github.com/jeannie-jy/Glimmer/blob/main/README.md" target="_blank" rel="noopener noreferrer" className="learn-link">README — 项目文档</a>
+        <a href="https://github.com/jeannie-jy/Glimmer/blob/main/DESIGN.md" target="_blank" rel="noopener noreferrer" className="learn-link">DESIGN.md — 设计系统</a>
+        <a href="https://github.com/jeannie-jy/Glimmer/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer" className="learn-link">CONTRIBUTING.md — 贡献指南</a>
       </div>
 
       <h2 className="learn-section__title" style={{ marginTop: 'var(--space-8)' }}><Play size={20} /> 演示 Demo</h2>
