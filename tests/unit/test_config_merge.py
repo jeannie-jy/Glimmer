@@ -102,7 +102,7 @@ def test_defaults_when_no_config(tmp_path: Path):
     assert cfg.model_id == "claude-sonnet-5"
     assert cfg.max_tokens == 4096
     assert cfg.max_retries == 3
-    assert cfg.enabled_tools == ["read_file", "write_file", "execute_shell", "run_tests", "search_code", "list_files", "restore_file"]
+    assert cfg.enabled_tools == ["read_file", "write_file", "execute_shell", "run_tests", "search_code", "list_files", "restore_file", "git"]
     assert cfg.learnings_limit == 20
     assert cfg.max_context_tokens == 8000
 
@@ -163,8 +163,8 @@ def test_lists_are_appended(tmp_path: Path):
     mgr._global_path = global_dir / ".harness" / "config.yaml"
 
     cfg = mgr.load()
-    # Merge order: defaults (7 tools), + global (appends 2), + project (appends 2) = 11.
-    assert len(cfg.enabled_tools) == 11
+    # Merge order: defaults (8 tools), + global (appends 2), + project (appends 2) = 12.
+    assert len(cfg.enabled_tools) == 12
     assert cfg.enabled_tools.count("read_file") == 2
     assert cfg.enabled_tools.count("write_file") == 2
     assert cfg.enabled_tools.count("execute_shell") == 2
@@ -172,6 +172,7 @@ def test_lists_are_appended(tmp_path: Path):
     assert cfg.enabled_tools.count("run_tests") == 1  # only in defaults
     assert cfg.enabled_tools.count("list_files") == 1  # only in defaults
     assert cfg.enabled_tools.count("restore_file") == 1  # only in defaults
+    assert cfg.enabled_tools.count("git") == 1  # only in defaults
 
 
 def test_global_config_extends_defaults(tmp_path: Path):

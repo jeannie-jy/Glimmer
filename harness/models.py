@@ -136,7 +136,7 @@ class ConfigData(BaseModel):
     command_whitelist_extra: list[str] = Field(default_factory=list)
     timeout_seconds: int = 30
     enabled_tools: list[str] = Field(default_factory=lambda: [
-        "read_file", "write_file", "execute_shell", "run_tests", "search_code", "list_files", "restore_file"
+        "read_file", "write_file", "execute_shell", "run_tests", "search_code", "list_files", "restore_file", "git"
     ])
     max_context_tokens: int = 8000
     learnings_limit: int = 20

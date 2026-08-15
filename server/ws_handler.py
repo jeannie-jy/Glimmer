@@ -23,6 +23,7 @@ from harness.tools.shell import ExecuteShellTool, RunTestsTool
 from harness.tools.code_search import SearchCodeTool
 from harness.tools.list_files import ListFilesTool
 from harness.tools.snapshots import SnapshotStore, RestoreFileTool
+from harness.tools.git_ops import GitTool
 from harness.guardrails.engine import GuardrailEngine
 from harness.feedback.analyzer import FeedbackAnalyzer
 from harness.feedback.retry_policy import RetryPolicy
@@ -65,6 +66,7 @@ def _build_default_tool_registry(docker_mgr=None, container_id=None, workspace_r
     registry.register(SearchCodeTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
     registry.register(ListFilesTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root))
     registry.register(RestoreFileTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root, snapshots=snapshots))
+    registry.register(GitTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
     return registry
 
 

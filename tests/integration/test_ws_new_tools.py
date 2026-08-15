@@ -68,3 +68,22 @@ def test_snapshot_and_restore_via_agent_loop(tmp_path, monkeypatch):
         _receive_until(ws, "session.complete")
     assert (tmp_path / "x.txt").read_text() == "v1"
     assert list((tmp_path / ".snaps").glob("*"))  # per-session snapshot dir exists
+
+
+def test_git_status_via_agent_loop(tmp_path, monkeypatch):
+    import subprocess
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "a.txt").write_text("x")
+    subprocess.run(["git", "add", "a.txt"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], cwd=tmp_path, check=True)
+
+    client = _make_client(tmp_path, monkeypatch, [
+        _tool_use("git", {"subcommand": "status"}),
+        _ok("Repo checked."),
+    ])
+    with client.websocket_connect("/ws/session") as ws:
+        ws.send_json({"type": "task.submit", "content": "Check git status"})
+        result = _receive_until(ws, "tool.result")
+        assert result["tool_name"] == "git"
+        assert result["exit_code"] == 0
+        _receive_until(ws, "session.complete")
