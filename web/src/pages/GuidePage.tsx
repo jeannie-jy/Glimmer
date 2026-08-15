@@ -255,7 +255,7 @@ memory:
           {[
             { step: '1', title: '输入任务', desc: '在 Agent 页面输入框描述你的需求。可以附带文件（支持 .py / .js / .ts 等，最大 95KB）。', icon: <Code2 size={16} /> },
             { step: '2', title: 'Agent 规划', desc: '状态机转入 PLANNING。LLM 分析任务，决定调用哪些工具。流式输出思考过程。', icon: <Zap size={16} /> },
-            { step: '3', title: '工具执行', desc: 'EXECUTING 状态。工具调用经过三层护栏检查，安全后在沙箱中执行。', icon: <Terminal size={16} /> },
+            { step: '3', title: '工具执行', desc: 'EXECUTING 状态。工具调用经过四层护栏检查，安全后在沙箱中执行。', icon: <Terminal size={16} /> },
             { step: '4', title: '反馈分析', desc: 'OBSERVING 状态。确定性分析执行结果。测试通过→继续；失败→自动修正。', icon: <Shield size={16} /> },
             { step: '5', title: '查看结果', desc: '任务完成后查看：Token 用量、工具调用次数、修改的文件、最终代码。', icon: <CheckCircle size={16} /> },
           ].map(w => (

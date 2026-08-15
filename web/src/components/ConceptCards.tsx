@@ -6,7 +6,7 @@ interface Concept { title: string; icon: React.ReactNode; summary: string; detai
 
 const CONCEPTS: Concept[] = [
   { title: '状态机（State Machine）', icon: <Zap size={20} />, summary: 'deterministic transition table — 纯函数路由决策', details: ['状态：IDLE → PLANNING → EXECUTING → OBSERVING → CORRECTING → COMPLETED', '转换由纯函数 transition(state, event) 计算，无 LLM 参与', '可完全在单元测试中验证（test_state_machine.py）'] },
-  { title: '三层护栏（Guardrails）', icon: <Shield size={20} />, summary: '路径沙箱 + 命令白名单 + 正则黑名单', details: ['Layer 1 - PathSandbox：限制文件读写范围', 'Layer 2 - CommandWhitelist：仅允许安全命令通过', 'Layer 3 - PatternBlacklist：拦截危险模式（rm -rf / 等）', '每层可返回 ALLOW / BLOCK / ASK_HUMAN'] },
+  { title: '四层护栏（Guardrails）', icon: <Shield size={20} />, summary: '路径沙箱 + 命令白名单 + 正则黑名单 + 敏感信息扫描与内网封锁', details: ['Layer 1 - PathSandbox：限制文件读写范围', 'Layer 2 - CommandWhitelist：仅允许安全命令通过', 'Layer 3 - PatternBlacklist：拦截危险模式（rm -rf / 等）', 'Layer 4 - SecretScan + Egress：密钥 ASK_HUMAN，内网 URL 硬封锁', '每层可返回 ALLOW / BLOCK / ASK_HUMAN'] },
   { title: '确定性反馈（Feedback Analysis）', icon: <BarChart3 size={20} />, summary: 'exit-code 和结构化报告分析，不依赖 LLM', details: ['run_tests → 解析 pytest-json-report', 'execute_shell → exit code 判定', 'RetryPolicy 检测 stuck loop（连续3次相同失败）'] },
   { title: '多模型适配（LLM Adapters）', icon: <Brain size={20} />, summary: '统一接口，即插即用', details: ['Anthropic：Messages API（claude-sonnet-5 等）', 'OpenAI：Chat Completions API（gpt-4o 等）', 'Mock：预设回复，零网络测试', '通过 ABC 抽象基类实现新 Provider'] },
 ];

@@ -65,7 +65,7 @@ Glimmer 是一个**从零构建的生产级 AI 编程智能体 Harness**。与�
 | 原则 | 实现方式 |
 |------|---------|
 | **代码而非提示词** | 状态机、反馈分析器、护栏均为纯函数代码——不依赖 LLM 推断。可用 Mock LLM 单元测试 |
-| **纵深防御** | 三层护栏系统：路径沙箱 → 命令白名单 → 正则黑名单 |
+| **纵深防御** | 四层护栏系统：路径沙箱 → 命令白名单 → 正则黑名单 → 敏感信息扫描 + 内网 URL 封锁 |
 | **供应商无关** | 可插拔 LLM 适配器。Anthropic / OpenAI / DeepSeek / 通义千问 / Ollama 自由切换 |
 | **默认可观测** | WebSocket 实时流式传输 Token、工具调用、状态转换、反馈判定 |
 | **双模式部署** | 单用户本地模式（零基础设施）或多用户 Docker 部署（PostgreSQL） |
@@ -77,7 +77,7 @@ Glimmer 是一个**从零构建的生产级 AI 编程智能体 Harness**。与�
 | 状态机驱动智能体循环 | ✅ | ✅ |
 | 多供应商 LLM | ✅ | ✅ |
 | WebSocket 实时流式 | ✅ | ✅ |
-| 三层护栏 | ✅ | ✅ |
+| 四层护栏 | ✅ | ✅ |
 | 确定性反馈分析 | ✅ | ✅ |
 | 自修正 + 重试策略 | ✅ | ✅ |
 | 记忆持久化 | ✅ | ✅ |
@@ -365,7 +365,7 @@ memory:
 
 ## 护栏系统
 
-Glimmer 采用**纵深防御**策略，三层串行检查：
+Glimmer 采用**纵深防御**策略，四层串行检查：
 
 ### 第一层 — 路径沙箱
 
@@ -396,6 +396,10 @@ result = sandbox.validate("/etc/passwd", "read")
 | `curl ... \| bash` | ASK_HUMAN | 远程脚本管道执行 |
 | `chmod 777 /` | ASK_HUMAN | 根路径全局可写 |
 | `dd if=` | ASK_HUMAN | 底层磁盘操作 |
+
+### 第四层 — 敏感信息扫描 + 内网 URL 封锁
+
+对 `write_file` 内容与 `execute_shell` 命令做高置信密钥模式扫描（私钥头、AWS/GitHub/Anthropic/OpenAI token、JWT），命中触发 `ASK_HUMAN` 人工确认（原因含脱敏片段）；对命令与 `web_fetch` 中的 URL 做 SSRF 校验——私网、回环、链路本地、云元数据地址一律 `BLOCK`（硬封锁，不可放行）。
 
 > **⚠️ 已知局限**：正则匹配可被编码、base64 混淆、间接执行绕过。高安全需求场景请配合 seccomp/AppArmor 系统级沙箱。
 
@@ -764,6 +768,7 @@ assert session.tool_calls[0].name == "read_file"
 第一层（路径沙箱）       ← 最可靠 — 文件系统边界
 第二层（命令白名单）      ← 中等 — 可执行文件名检查
 第三层（正则黑名单）      ← 最弱 — 正则，可被绕过
+第四层（敏感信息扫描 + 内网封锁） ← 密钥 ASK_HUMAN + SSRF 硬封锁
          +
 进程隔离（subprocess.run + shell=False + timeout）
 ```
