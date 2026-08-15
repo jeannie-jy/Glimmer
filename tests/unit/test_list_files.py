@@ -6,12 +6,13 @@ from harness.tools.list_files import ListFilesTool
 
 
 class FakeDocker:
-    def __init__(self):
+    def __init__(self, stdout=""):
         self.calls: list[str] = []
+        self.stdout = stdout
 
     async def exec(self, container_id, cmd, timeout=10):
         self.calls.append(cmd)
-        return SimpleNamespace(exit_code=0, stdout="", stderr="")
+        return SimpleNamespace(exit_code=0, stdout=self.stdout, stderr="")
 
 
 def test_lists_files_with_depth_and_skip_dirs(tmp_path):
@@ -62,3 +63,17 @@ def test_docker_mode_runs_find(tmp_path):
     assert "find" in docker.calls[0]
     assert "maxdepth" in docker.calls[0]
     assert result.exit_code == 0
+
+
+def test_docker_mode_filters_skip_dirs(tmp_path):
+    docker = FakeDocker(
+        stdout="app.py\t123\t2026-08-15T10:00\n"
+               "node_modules/junk.js\t456\t2026-08-15T10:00\n"
+    )
+    tool = ListFilesTool(docker_mgr=docker, container_id="c1", workspace_root=tmp_path)
+    result = asyncio.run(tool.execute({"max_depth": 2}))
+
+    names = [f["name"] for f in result.structured["files"]]
+    assert "app.py" in names
+    assert "node_modules/junk.js" not in names
+    assert "node_modules" not in result.stdout

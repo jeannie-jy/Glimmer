@@ -104,6 +104,8 @@ class ListFilesTool(Tool):
             if len(parts) < 3:
                 continue
             name = f"{clean}/{parts[0]}" if clean else parts[0]
+            if any(part in SKIP_DIRS for part in name.split("/")):
+                continue
             try:
                 size = int(parts[1])
             except ValueError:
