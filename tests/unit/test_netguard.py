@@ -41,6 +41,14 @@ def test_blocks_loopback_and_metadata():
     assert validate_url("http://[::1]/") is not None
 
 
+def test_blocks_ipv4_mapped_ipv6_loopback():
+    assert validate_url("http://[::ffff:127.0.0.1]/") is not None
+
+
+def test_blocks_ipv4_mapped_ipv6_metadata():
+    assert validate_url("http://[::ffff:169.254.169.254]/latest/meta-data/") is not None
+
+
 def test_blocks_private_ranges():
     assert validate_url("http://10.0.0.1/") is not None
     assert validate_url("http://172.16.0.5/") is not None
