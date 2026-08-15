@@ -52,7 +52,7 @@
 }
 ```
 
-**输出**：`ToolResult.structured = {"files": [{"name": "相对路径", "size": int, "modified": "YYYY-MM-DDTHH:MM"}]}`，stdout 输出摘要（N files）。目录本身不下发（LLM 从路径推断结构即可，控制 token 消耗）。
+**输出**：`ToolResult.structured = {"files": [{"name": "相对路径", "size": int, "modified": "YYYY-MM-DDTHH:MM"}]}`；stdout 为文件相对路径列表（每行一个，超 300 条截断注明）——LLM 的消息上下文只含 stdout，列表必须进 stdout。目录本身不下发（LLM 从路径推断结构即可，控制 token 消耗）。
 
 **实现**：
 - 本地/Render：基于 `_list_local_files()` 的逻辑改造为 `harness/tools/list_files.py`——相对 workspace 根、深度限制、跳过 `_LOCAL_SKIP_DIRS`/`_LOCAL_SKIP_FILES`/`_LOCAL_SKIP_SUFFIXES`。
@@ -122,9 +122,9 @@
 }
 ```
 
-**输出**：structured `{"final_url", "status_code", "content_type", "content"}`；content 截断至 512KB（stdout 同时给摘要）。重定向：最多跟随 5 跳，每跳重新校验 URL。
+**输出**：structured `{"final_url", "status_code", "content_type", "content"}`；content 截断至 512KB；stdout 为正文内容（再截断至 4096 字符——LLM 消息上下文只含 stdout，agent 靠它读页面）。重定向：最多跟随 5 跳，每跳重新校验 URL。
 
-**SSRF 校验器**（新模块 `harness/tools/web/netguard.py`，工具与护栏引擎共用）：
+**SSRF 校验器**（新模块 `harness/netguard.py`，工具与护栏引擎共用）：
 
 1. scheme 仅 http/https；端口仅 80/443。
 2. 域名解析后逐 IP 校验，拒绝：`127.0.0.0/8`、`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`169.254.0.0/16`（含云元数据）、`0.0.0.0`、`::1`、`fc00::/7`、`fe80::/10`。
@@ -159,7 +159,7 @@
 
 ## B3 egress 护栏
 
-**位置**：`GuardrailEngine.check` 在 execute_shell 的 whitelist/pattern 检查之后增加：从 command 字符串提取 URL（`https?://[^\s"'`]+`），逐 URL 过 netguard。
+**位置**：`GuardrailEngine.check` 在 execute_shell/run_tests 的 whitelist/pattern 检查**之前**增加（BLOCK 优先于 ASK_HUMAN：curl 等不在白名单的命令会先被 ASK_HUMAN 拦截，egress 若放在白名单之后则内网 URL 永远无法硬封锁）：从 command 字符串提取 URL（`https?://[^\s"'`]+`），逐 URL 过 netguard。
 
 **规则**：与 A5 相同（公网开放 + 内网/元数据硬封锁）。沙箱形态无网络，检查结果通常全放行，无害。
 
@@ -186,6 +186,8 @@
 7. 全量验证：pytest（基线 192）+ vitest（基线 9）+ `npm run build`，提交推送 main
 
 **TDD 纪律**：每个工具先写失败测试再实现；集成测试经 ws 流用 MockLLMAdapter 的 tool_use 触发真实工具执行；所有新工具注册进默认 tool registry 与 enabled_tools。
+
+**tool.result 事件增加 structured 字段**（loop.py 的 emit 加 `structured=result.structured`）——否则新工具的 structured 数据到不了前端。
 
 ## 不做的事（YAGNI）
 
