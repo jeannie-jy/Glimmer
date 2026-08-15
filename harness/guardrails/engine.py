@@ -41,6 +41,12 @@ class GuardrailEngine:
                 if result.action != GuardAction.ALLOW:
                     return result
 
+        # Layer 1 also: Path sandbox for restore_file path
+        if tool_call.name == "restore_file":
+            result = self._path_sandbox.validate(tool_call.arguments.get("path", ""), "write")
+            if result.action != GuardAction.ALLOW:
+                return result
+
         # Layer 2 & 3: Command safety for shell execution
         if tool_call.name in ("execute_shell", "run_tests"):
             command = tool_call.arguments.get("command", "")

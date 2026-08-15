@@ -86,12 +86,16 @@ class ReadFileTool(Tool):
 
 
 class WriteFileTool(Tool):
-    def __init__(self, docker_mgr=None, container_id=None, workspace_root: Path | None = None):
+    def __init__(self, docker_mgr=None, container_id=None, workspace_root: Path | None = None,
+                 snapshots=None):
         self._docker_mgr = docker_mgr
         self._container_id = container_id
         # Local mode: resolve relative paths under the workspace root
         # (WORKSPACE_ROOT) when set; otherwise relative to the process cwd.
         self._workspace_root = workspace_root
+        # Pre-overwrite snapshot store (harness.tools.snapshots.SnapshotStore).
+        # Duck-typed reference to avoid a circular import.
+        self._snapshots = snapshots
 
     @property
     def name(self) -> str:
@@ -120,6 +124,11 @@ class WriteFileTool(Tool):
         if self._docker_mgr and self._container_id:
             spath = _sandbox_path(path)
             try:
+                # Snapshot the current content before overwriting.
+                if self._snapshots is not None:
+                    prev = await self._docker_mgr.exec(self._container_id, f"cat {shlex.quote(spath)}", timeout=5)
+                    if prev.exit_code == 0:
+                        self._snapshots.save(path, prev.stdout)
                 import base64
                 parent = posixpath.dirname(spath)
                 await self._docker_mgr.exec(self._container_id, f"mkdir -p {shlex.quote(parent)}", timeout=5)
@@ -139,6 +148,10 @@ class WriteFileTool(Tool):
 
         try:
             p = self._workspace_root / path if self._workspace_root else Path(path)
+            # Snapshot before overwriting an existing file so restore_file
+            # can roll the change back.
+            if self._snapshots is not None and p.exists():
+                self._snapshots.save(path, p.read_text(encoding="utf-8", errors="replace"))
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content, encoding="utf-8")
             return ToolResult(tool_name="write_file", exit_code=0,

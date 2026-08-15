@@ -51,3 +51,20 @@ def test_list_files_via_agent_loop(tmp_path, monkeypatch):
         assert "hello.txt" in result["stdout"]
         assert any(f["name"] == "hello.txt" for f in (result.get("structured") or {}).get("files", []))
         _receive_until(ws, "session.complete")
+
+
+def test_snapshot_and_restore_via_agent_loop(tmp_path, monkeypatch):
+    (tmp_path / "x.txt").write_text("v1")
+    monkeypatch.setenv("SNAPSHOT_DIR", str(tmp_path / ".snaps"))
+    client = _make_client(tmp_path, monkeypatch, [
+        _tool_use("write_file", {"path": "x.txt", "content": "v2"}),
+        _tool_use("restore_file", {"path": "x.txt"}),
+        _ok("Restored."),
+    ])
+    with client.websocket_connect("/ws/session") as ws:
+        ws.send_json({"type": "task.submit", "content": "Overwrite then restore x.txt"})
+        _receive_until(ws, "tool.result")  # write_file
+        _receive_until(ws, "tool.result")  # restore_file
+        _receive_until(ws, "session.complete")
+    assert (tmp_path / "x.txt").read_text() == "v1"
+    assert list((tmp_path / ".snaps").glob("*"))  # per-session snapshot dir exists

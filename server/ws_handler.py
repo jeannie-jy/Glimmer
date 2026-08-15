@@ -22,6 +22,7 @@ from harness.tools.file_ops import ReadFileTool, WriteFileTool
 from harness.tools.shell import ExecuteShellTool, RunTestsTool
 from harness.tools.code_search import SearchCodeTool
 from harness.tools.list_files import ListFilesTool
+from harness.tools.snapshots import SnapshotStore, RestoreFileTool
 from harness.guardrails.engine import GuardrailEngine
 from harness.feedback.analyzer import FeedbackAnalyzer
 from harness.feedback.retry_policy import RetryPolicy
@@ -55,14 +56,15 @@ def configure(
         app.state.ws_llm_override = llm_override
 
 
-def _build_default_tool_registry(docker_mgr=None, container_id=None, workspace_root: Path | None = None) -> ToolRegistry:
+def _build_default_tool_registry(docker_mgr=None, container_id=None, workspace_root: Path | None = None, snapshots=None) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(ReadFileTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root))
-    registry.register(WriteFileTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root))
+    registry.register(WriteFileTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root, snapshots=snapshots))
     registry.register(ExecuteShellTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
     registry.register(RunTestsTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
     registry.register(SearchCodeTool(docker_mgr=docker_mgr, container_id=container_id, cwd=workspace_root))
     registry.register(ListFilesTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root))
+    registry.register(RestoreFileTool(docker_mgr=docker_mgr, container_id=container_id, workspace_root=workspace_root, snapshots=snapshots))
     return registry
 
 
@@ -638,10 +640,23 @@ async def websocket_session(websocket: WebSocket) -> None:
             container_id = None
 
     def _build_components():
+        # Snapshot store lives OUTSIDE the agent-accessible workspace:
+        # in-process modes default to ~/.harness/snapshots (Render's
+        # /workspace IS the workspace, so it must not host the store);
+        # Docker mode uses a host-side WORKSPACE_ROOT sibling the container
+        # never mounts. SNAPSHOT_DIR overrides for tests.
+        env_snap = os.environ.get("SNAPSHOT_DIR")
+        if env_snap:
+            snap_base = Path(env_snap) / harness_session.id
+        elif container_id:
+            snap_base = Path(os.environ.get("WORKSPACE_ROOT", "/workspace")) / ".harness-snapshots" / harness_session.id
+        else:
+            snap_base = Path.home() / ".harness" / "snapshots" / harness_session.id
+        snapshots = SnapshotStore(snap_base)
         tools = getattr(app_state, 'ws_tool_registry', None)
         if tools is None:
             tools = _build_default_tool_registry(docker_mgr=docker_mgr, container_id=container_id,
-                                                 workspace_root=_workspace_root())
+                                                 workspace_root=_workspace_root(), snapshots=snapshots)
         # WORKSPACE_ROOT (when set) pins the agent's file operations to the
         # dedicated workspace directory instead of the server cwd — without
         # it, deployed servers without a Docker socket would expose their
