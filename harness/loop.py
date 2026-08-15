@@ -348,6 +348,7 @@ class AgentLoop:
                         tool_name=result.tool_name, exit_code=result.exit_code,
                         stdout=result.stdout[:2000], stderr=result.stderr[:1000],
                         duration_ms=result.duration_ms,
+                        structured=result.structured,
                     )
 
             elif session.state == State.OBSERVING:

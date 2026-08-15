@@ -57,7 +57,7 @@ def _config_payload(cfg) -> dict:
         "has_api_key": bool(cfg.api_key_enc),
         "command_whitelist_extra": [],
         "sandbox_root": ".",
-        "enabled_tools": ["read_file", "write_file", "execute_shell", "run_tests", "search_code"],
+        "enabled_tools": ["read_file", "write_file", "execute_shell", "run_tests", "search_code", "list_files"],
         "max_context_tokens": 8000,
         "learnings_limit": 20,
     }
